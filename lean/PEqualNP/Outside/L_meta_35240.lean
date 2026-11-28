@@ -1154,9 +1154,9 @@ def lookRawCore (NN AA HX HY : Nat) (restrict : Bool) (l m g : Nat) (enabled : B
     (fun _ ih k t z v => Bool.rec (motive := fun _ => Bool) (guardedCoverage NN enabled (pos t) l v (tstC NN AA HX HY (pos t) l (Nat.sub (Nat.succ k) t) v (fun y => mvRawC NN AA HX HY restrict ih l m g k t z v y))) true (Nat.ble v.length 1)) fuel
 abbrev lookRawC (NN AA HX HY : Nat) (restrict : Bool) (l m g fuel : Nat) : Nat → Nat → Nat → List W → Bool :=
   lookRawCore NN AA HX HY restrict l m g (Nat.beq fuel 14) fuel
-def look1RawC (NN AA HX HY : Nat) (restrict : Bool) (l m g K : Nat) (fuel : Nat) : Nat → Nat → Nat → List W → Bool :=
+def look1RawC (reject : ℕ → ℕ → ℕ → List W → Bool) (NN AA HX HY : Nat) (restrict : Bool) (l m g K : Nat) (fuel : Nat) : Nat → Nat → Nat → List W → Bool :=
   Nat.rec (motive := fun _ => Nat → Nat → Nat → List W → Bool) (fun _ _ _ _ => true)
-    (fun _ ih k t z v => Bool.rec (motive := fun _ => Bool) (tstC NN AA HX HY (pos t) l (Nat.sub (Nat.succ k) t) v (fun y =>
+    (fun _ ih k t z v => bif reject k t z v then false else Bool.rec (motive := fun _ => Bool) (tstC NN AA HX HY (pos t) l (Nat.sub (Nat.succ k) t) v (fun y =>
       Bool.rec (motive := fun _ => Bool) (mvRawC NN AA HX HY restrict (lookRawC NN AA HX HY restrict l m g K) l m g k t z v y) true
         (nodeC NN (ih (Nat.sub k 1) t) (pos t) l m g (Nat.sub (Nat.sub k t) y) v.length z v pairsS))) true (Nat.ble v.length 1)) fuel
 
@@ -1234,7 +1234,7 @@ abbrev tst := tstC I.NN I.AA I.HX I.HY
 abbrev mvRaw := mvRawC I.NN I.AA I.HX I.HY
 
 abbrev lookRaw := lookRawC I.NN I.AA I.HX I.HY
-abbrev look1Raw := look1RawC I.NN I.AA I.HX I.HY
+abbrev look1Raw (reject : ℕ → ℕ → ℕ → List W → Bool) := look1RawC reject I.NN I.AA I.HX I.HY
 
 
 abbrev mv := mvC I.NN I.AA I.HX I.HY
@@ -3374,20 +3374,29 @@ theorem look1_sound (hR : RR R) (hR2 : ∀ d a b, (R a = 0 ∨ R b = 0) → Al R
 end sound
 
 
+def RejectSound (restrict : Bool) (R : ℕ → ℕ) (m T : ℕ) (reject : ℕ → ℕ → ℕ → List W → Bool) : Prop :=
+  ∀ {k t z v S k'}, Rep v S → k' ≤ k → Live Z0 m T k' t S →
+    (∀ q < k', ¬ Sol Z0 m T q (C m ({x | R x ≠ 0} ∪ (S : Set ℕ)))) →
+    RawMode restrict R m T k' t S → reject k t z v = true → False
+
 section sound
 variable {P : List ℕ} {l m g T : ℕ} (X : Ctx P l m g T)
 include X
-theorem look1Raw_sound (restrict : Bool) (hR : RR R) (hR2 : ∀ d a b, (R a = 0 ∨ R b = 0) → Al R d a b) {K : ℕ} : ∀ (fuel k t z : ℕ) (v : List W) (S : Finset ℕ),
-    look1Raw restrict l m g K fuel k t z v = false → StOk P T l k z v S → (∀ w ∈ v, w.r = R w.s) →
+theorem look1Raw_sound (reject : ℕ → ℕ → ℕ → List W → Bool) (restrict : Bool) (valid : RejectSound restrict R m T reject) (hR : RR R) (hR2 : ∀ d a b, (R a = 0 ∨ R b = 0) → Al R d a b) {K : ℕ} : ∀ (fuel k t z : ℕ) (v : List W) (S : Finset ℕ),
+    look1Raw reject restrict l m g K fuel k t z v = false → StOk P T l k z v S → (∀ w ∈ v, w.r = R w.s) →
       ∀ k' ≤ k, Live Z0 m T k' t S → (∀ q < k', ¬ Sol Z0 m T q (C m ({x | R x ≠ 0} ∪ (S : Set ℕ)))) → RawMode restrict R m T k' t S → False := by
   intro fuel
   induction fuel with
   | zero => intro k t z v S h; simp [look1Raw, look1RawC] at h
   | succ fuel ih =>
     intro k t z v S h hs hcod k' hk hl hmW ready
-    change (Bool.rec (motive := fun _ => Bool) (tst (pos t) l (k + 1 - t) v (fun y => Bool.rec (motive := fun _ => Bool) (mvRaw restrict (lookRaw restrict l m g K) l m g k t z v y) true
-        (node (look1Raw restrict l m g K fuel (k - 1) t) (pos t) l m g (k - t - y) v.length z v pairsS))) true (Nat.ble v.length 1) : Bool) = false at h
-    rw [bR, pos_eq] at h
+    have hmin : Min Z0 m T k' t S := ⟨hl, fun q hq hs =>
+      hmW q hq (hs.mono le_rfl (C_mono Set.subset_union_right))⟩
+    cases pruned : reject k t z v
+    case true => exact valid hs.rep hk hl hmW ready pruned
+    change (bif reject k t z v then false else Bool.rec (motive := fun _ => Bool) (tst (pos t) l (k + 1 - t) v (fun y => Bool.rec (motive := fun _ => Bool) (mvRaw restrict (lookRaw restrict l m g K) l m g k t z v y) true
+        (node (look1Raw reject restrict l m g K fuel (k - 1) t) (pos t) l m g (k - t - y) v.length z v pairsS))) true (Nat.ble v.length 1) : Bool) = false at h
+    rw [pruned, Bool.cond_false, bR, pos_eq] at h
     cases h0 : Nat.ble v.length 1 with
     | true => rw [h0] at h; simp at h
     | false =>
@@ -3395,7 +3404,6 @@ theorem look1Raw_sound (restrict : Bool) (hR : RR R) (hR2 : ∀ d a b, (R a = 0 
       have hlen : 2 ≤ v.length := by
         by_contra hc
         rw [Nat.ble_eq_true_of_le (by omega)] at h0; simp at h0
-      have hmin : Min Z0 m T k' t S := ⟨hl, fun q hq hs => hmW q hq (hs.mono le_rfl (C_mono Set.subset_union_right))⟩
       obtain ⟨y, hFy, hyk⟩ := tst_sound X hs hmin hk
       have hy := (hFy _).symm.trans h
       beta_reduce at hy
@@ -3552,14 +3560,14 @@ def startvC (NN AA HX HY l m g B K t p H ph : ℕ) (v : List W) : Bool :=
     (child (fun z r => topCC NN AA HX HY l m g K H ph K t z r) g (fun h => h v) (Nat.sub B (sumc v)))
     (Nat.ble v.length (Nat.sub (Nat.succ K) t))) (hasP p v)
 abbrev startv := startvC I.NN I.AA I.HX I.HY
-def topRawCC (NN AA HX HY l m g K H ph k t z : ℕ) (v : List W) : Bool :=
+def topRawCC (reject : ℕ → ℕ → ℕ → List W → Bool) (NN AA HX HY l m g K H ph k t z : ℕ) (v : List W) : Bool :=
   Bool.rec (motive := fun _ => Bool) (tstC NN AA HX HY (pos t) l (Nat.sub (Nat.succ k) t) v (fun y =>
     Bool.rec (motive := fun _ => Bool) (Bool.rec (motive := fun _ => Bool) false (mvRawC NN AA HX HY true (lookRawC NN AA HX HY true l m g K) l m g k t z v y) (Nat.beq ph 1)) true
-      (nodeC NN (look1RawC NN AA HX HY true l m g K K (Nat.sub k 1) t) (pos t) l m g (Nat.sub (Nat.sub k t) y) v.length z v (fun h xs => pairsC H h (fs xs))))) true (Nat.ble v.length 1)
-abbrev topRawC := topRawCC I.NN I.AA I.HX I.HY
-def startRawvC (NN AA HX HY l m g B K t p H ph : ℕ) (v : List W) : Bool :=
+      (nodeC NN (look1RawC reject NN AA HX HY true l m g K K (Nat.sub k 1) t) (pos t) l m g (Nat.sub (Nat.sub k t) y) v.length z v (fun h xs => pairsC H h (fs xs))))) true (Nat.ble v.length 1)
+abbrev topRawC (reject : ℕ → ℕ → ℕ → List W → Bool) := topRawCC reject I.NN I.AA I.HX I.HY
+def startRawvC (reject : ℕ → ℕ → ℕ → List W → Bool) (NN AA HX HY l m g B K t p H ph : ℕ) (v : List W) : Bool :=
   Bool.rec (motive := fun _ => Bool) false (Bool.rec (motive := fun _ => Bool) false
-    (child (fun z r => topRawCC NN AA HX HY l m g K H ph K t z r) g (fun h => h v) (Nat.sub B (sumc v)))
+    (child (fun z r => topRawCC reject NN AA HX HY l m g K H ph K t z r) g (fun h => h v) (Nat.sub B (sumc v)))
     (Nat.ble v.length (Nat.sub (Nat.succ K) t))) (hasP p v)
 
 end
@@ -3780,11 +3788,11 @@ noncomputable def chk (E Q : List (ℕ × ℕ)) (Z K t H ph : ℕ) : Bool :=
     (pwr E Z)) (pL (Q.map fun e => 16 + (K - e.2)))) (pL (Q.map fun _ => 16))) (PZ Q)) (mz Z)) (lz Z)
 
 
-noncomputable def chkRaw (E Q : List (ℕ × ℕ)) (Z K t H ph : ℕ) : Bool :=
+noncomputable def chkRaw (reject : ℕ → ℕ → ℕ → List W → Bool) (E Q : List (ℕ × ℕ)) (Z K t H ph : ℕ) : Bool :=
   (fun l => (fun m => (fun P => (fun g => (fun B => (fun p =>
     frc (avl P m (rawL E)) (fun v => st l fun l => st m fun m => st g fun g => st B fun B => st p fun p =>
       st I.NN fun nn => st I.AA fun aa => st I.HX fun hx => st I.HY fun hy =>
-      anySubC nn (pos t) l v 0 (fun r => startRawvC nn aa hx hy l m g B K t p H ph r)))
+      anySubC nn (pos t) l v 0 (fun r => startRawvC reject nn aa hx hy l m g B K t p H ph r)))
     (pwr E Z)) (pL (Q.map fun e => 16 + (K - e.2)))) (pL (Q.map fun _ => 16))) (PZ Q)) (mz Z)) (lz Z)
 
 
@@ -4593,44 +4601,44 @@ lemma noMovesRaw {v : List W} (h : v.any (fun w => Nat.beq w.r 0) = false)
     mvRawC nn aa hx hy true F l m g k 0 z v y = false :=
   noMoves h nn aa hx hy l m g k z y F
 
-noncomputable def topPairPicked (NN AA HX HY l m g K H ph k t z : ℕ)
+noncomputable def topPairPicked (reject : ℕ → ℕ → ℕ → List W → Bool) (NN AA HX HY l m g K H ph k t z : ℕ)
     (v : List W) (kind : Bool) : Bool :=
   Bool.rec (motive := fun _ => Bool) (tstC NN AA HX HY (pos t) l (Nat.sub (Nat.succ k) t) v (fun y =>
     Bool.rec (motive := fun _ => Bool)
       (Bool.rec (motive := fun _ => Bool) false
         (mvRawC NN AA HX HY true (lookRawC NN AA HX HY true l m g K) l m g k t z v y) (Nat.beq ph 1)) true
-      (nodePicked NN (look1RawC NN AA HX HY true l m g K K (Nat.sub k 1) t) (pos t) l m g (Nat.sub (Nat.sub k t) y)
+      (nodePicked NN (look1RawC reject NN AA HX HY true l m g K K (Nat.sub k 1) t) (pos t) l m g (Nat.sub (Nat.sub k t) y)
         v.length z v H kind))) true (Nat.ble v.length 1)
 
-lemma topPair_picked (nn aa hx hy l m g K H ph k t z : ℕ) (v : List W) :
-    topRawCC nn aa hx hy l m g K H ph k t z v = true →
-      ∃ b : Fin 8, topPairPicked nn aa hx hy l m g K H ph k t z v (cvOp b) = true := by
+lemma topPair_picked (reject : ℕ → ℕ → ℕ → List W → Bool) (nn aa hx hy l m g K H ph k t z : ℕ) (v : List W) :
+    topRawCC reject nn aa hx hy l m g K H ph k t z v = true →
+      ∃ b : Fin 8, topPairPicked reject nn aa hx hy l m g K H ph k t z v (cvOp b) = true := by
   simp only [topRawCC, topPairPicked, bR]
   cases ht : Nat.ble v.length 1
   · simp only [ht, Bool.cond_false]
     apply tst_picked
     intro y h
     dsimp only at h ⊢
-    cases hx' : nodeC nn (look1RawC nn aa hx hy true l m g K K (Nat.sub k 1) t) (pos t) l m g
+    cases hx' : nodeC nn (look1RawC reject nn aa hx hy true l m g K K (Nat.sub k 1) t) (pos t) l m g
         (Nat.sub (Nat.sub k t) y) v.length z v (fun h xs => pairsC H h (fs xs))
     · simp only [hx', Bool.cond_false] at h
       refine ⟨0, ?_⟩
       rw [h]
-      cases nodePicked nn (look1RawC nn aa hx hy true l m g K K (Nat.sub k 1) t) (pos t) l m g
+      cases nodePicked nn (look1RawC reject nn aa hx hy true l m g K K (Nat.sub k 1) t) (pos t) l m g
         (Nat.sub (Nat.sub k t) y) v.length z v H (cvOp 0) <;> rfl
     · obtain ⟨b,hb⟩ := node_picked _ _ _ _ _ _ _ _ _ _ _ hx'
       exact ⟨b, by simp only [hb, Bool.cond_true]⟩
   · simp only [ht, Bool.cond_true]
     exact fun _ => ⟨0,by simp⟩
 
-noncomputable def startPairPicked (NN AA HX HY l m g B K t p H ph : ℕ) (v : List W) (kind : Bool) : Bool :=
+noncomputable def startPairPicked (reject : ℕ → ℕ → ℕ → List W → Bool) (NN AA HX HY l m g B K t p H ph : ℕ) (v : List W) (kind : Bool) : Bool :=
   Bool.rec (motive := fun _ => Bool) false (Bool.rec (motive := fun _ => Bool) false
-    (child (fun z r => topPairPicked NN AA HX HY l m g K H ph K t z r kind) g (fun h => h v) (Nat.sub B (sumc v)))
+    (child (fun z r => topPairPicked reject NN AA HX HY l m g K H ph K t z r kind) g (fun h => h v) (Nat.sub B (sumc v)))
     (Nat.ble v.length (Nat.sub (Nat.succ K) t))) (hasP p v)
 
-lemma startPair_picked (nn aa hx hy l m g B K t p H ph : ℕ) :
-    picked (startRawvC nn aa hx hy l m g B K t p H ph)
-      (fun b v => startPairPicked nn aa hx hy l m g B K t p H ph v (cvOp b)) := by
+lemma startPair_picked (reject : ℕ → ℕ → ℕ → List W → Bool) (nn aa hx hy l m g B K t p H ph : ℕ) :
+    picked (startRawvC reject nn aa hx hy l m g B K t p H ph)
+      (fun b v => startPairPicked reject nn aa hx hy l m g B K t p H ph v (cvOp b)) := by
   intro v
   simp only [startRawvC, startPairPicked, child, st_eq, bR]
   cases h : hasP p v
@@ -4642,13 +4650,13 @@ lemma startPair_picked (nn aa hx hy l m g B K t p H ph : ℕ) :
       cases hz : Nat.beq (Nat.land (Nat.sub B (sumc v)) g) g
       · simp [hz]
       · simp only [hz, Bool.cond_true]
-        exact topPair_picked _ _ _ _ _ _ _ _ _ _ _ _ _ _
+        exact topPair_picked reject _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
-noncomputable def chkPairPicked (E Q : List (ℕ × ℕ)) (Z K t H ph : ℕ) (kind : Bool) : Bool :=
+noncomputable def chkPairPicked (reject : ℕ → ℕ → ℕ → List W → Bool) (E Q : List (ℕ × ℕ)) (Z K t H ph : ℕ) (kind : Bool) : Bool :=
   (fun l => (fun m => (fun P => (fun g => (fun B => (fun p =>
     frc (avl P m (rawL E)) (fun v => st l fun l => st m fun m => st g fun g => st B fun B => st p fun p =>
       st I.NN fun nn => st I.AA fun aa => st I.HX fun hx => st I.HY fun hy =>
-      anySubC nn (pos t) l v 0 (fun r => startPairPicked nn aa hx hy l m g B K t p H ph r kind)))
+      anySubC nn (pos t) l v 0 (fun r => startPairPicked reject nn aa hx hy l m g B K t p H ph r kind)))
     (pwr E Z)) (pL (Q.map fun e => 16 + (K - e.2)))) (pL (Q.map fun _ => 16))) (PZ Q)) (mz Z)) (lz Z)
 
 lemma noNodePicked {v : List W} {H : ℕ} (h : possibleInputPair H v = false)
@@ -4656,40 +4664,40 @@ lemma noNodePicked {v : List W} {H : ℕ} (h : possibleInputPair H v = false)
     nodePicked nn f d l m g e n z v H kind = false := by
   simp only [nodePicked, pairImpossible _ h, bR, Bool.cond_self]
 
-lemma inactiveTopPicked {t H ph : ℕ} {v : List W} (h : relevantStart t H ph v = false)
+lemma inactiveTopPicked (reject : ℕ → ℕ → ℕ → List W → Bool) {t H ph : ℕ} {v : List W} (h : relevantStart t H ph v = false)
     (nn aa hx hy l m g K k z : ℕ) (kind : Bool) :
-    topPairPicked nn aa hx hy l m g K H ph k t z v kind = false := by
+    topPairPicked reject nn aa hx hy l m g K H ph k t z v kind = false := by
   obtain ⟨hl, hm, hp⟩ := relevantStart_facts h
   simp only [topPairPicked, hl, noNodePicked hp, bR]
   rcases hm with hm | ⟨rfl, hv⟩
   · simp only [hm, Bool.cond_false, tst_const_false]
   · simp only [noMovesRaw hv, Bool.cond_self, tst_const_false]
 
-lemma inactiveStartPicked {t H ph : ℕ} {v : List W} (h : relevantStart t H ph v = false)
+lemma inactiveStartPicked (reject : ℕ → ℕ → ℕ → List W → Bool) {t H ph : ℕ} {v : List W} (h : relevantStart t H ph v = false)
     (nn aa hx hy l m g B K p : ℕ) (kind : Bool) :
-    startPairPicked nn aa hx hy l m g B K t p H ph v kind = false := by
-  simp only [startPairPicked, child, st_eq, inactiveTopPicked h, bR, Bool.cond_self]
+    startPairPicked reject nn aa hx hy l m g B K t p H ph v kind = false := by
+  simp only [startPairPicked, child, st_eq, inactiveTopPicked reject h, bR, Bool.cond_self]
 
-noncomputable def chkPairFast (E Q : List (ℕ × ℕ)) (Z K t H ph : ℕ) (kind : Bool) : Bool :=
+noncomputable def chkPairFast (reject : ℕ → ℕ → ℕ → List W → Bool) (E Q : List (ℕ × ℕ)) (Z K t H ph : ℕ) (kind : Bool) : Bool :=
   searchInputs E Q Z K t H ph (fun nn aa hx hy l m g B p v =>
-    startPairPicked nn aa hx hy l m g B K t p H ph v kind)
+    startPairPicked reject nn aa hx hy l m g B K t p H ph v kind)
 
-lemma chkPairFast_eq (E Q : List (ℕ × ℕ)) (Z K t H ph : ℕ) (kind : Bool) :
-    chkPairFast E Q Z K t H ph kind = chkPairPicked E Q Z K t H ph kind := by
+lemma chkPairFast_eq (reject : ℕ → ℕ → ℕ → List W → Bool) (E Q : List (ℕ × ℕ)) (Z K t H ph : ℕ) (kind : Bool) :
+    chkPairFast reject E Q Z K t H ph kind = chkPairPicked reject E Q Z K t H ph kind := by
   unfold chkPairFast
   rw [searchInputs_eq (fun nn aa hx hy l m g B p _ h =>
-    inactiveStartPicked h nn aa hx hy l m g B K p kind)]
+    inactiveStartPicked reject h nn aa hx hy l m g B K p kind)]
   rfl
 
-lemma chkPair_picked (E Q : List (ℕ × ℕ)) (Z K t H ph : ℕ)
-    (h : ∀ b : Bool, chkPairPicked E Q Z K t H ph b = false) : chkRaw E Q Z K t H ph = false := by
-  suffices chkRaw E Q Z K t H ph = true → False by
-    cases he : chkRaw E Q Z K t H ph
+lemma chkPair_picked (reject : ℕ → ℕ → ℕ → List W → Bool) (E Q : List (ℕ × ℕ)) (Z K t H ph : ℕ)
+    (h : ∀ b : Bool, chkPairPicked reject E Q Z K t H ph b = false) : chkRaw reject E Q Z K t H ph = false := by
+  suffices chkRaw reject E Q Z K t H ph = true → False by
+    cases he : chkRaw reject E Q Z K t H ph
     · rfl
     · exact (this he).elim
   intro hex
   simp only [chkRaw, chkPairPicked, frc_eq, st_eq] at h hex
-  obtain ⟨b,hb⟩ := anySub_picked _ _ _ _ _ _ (startPair_picked _ _ _ _ _ _ _ _ _ _ _ _ _) _ hex
+  obtain ⟨b,hb⟩ := anySub_picked _ _ _ _ _ _ (startPair_picked reject _ _ _ _ _ _ _ _ _ _ _ _ _) _ hex
   exact Bool.noConfusion ((h (cvOp b)).symm.trans hb)
 
 end BinaryPartition
@@ -4751,9 +4759,9 @@ lemma oneRaw_bi_sound (restrict : Bool) (hR : RR R) (hR2 : ∀ d a b, (R a = 0 �
       · exact Or.inr (Or.inl (Or.inr hx'))
     · exact Or.inr (Or.inr hx)
 set_option maxHeartbeats 0 in
-lemma topRawC_bi_sound (hR : RR R) (hR2 : ∀ d a b, (R a = 0 ∨ R b = 0) → Al R d a b)
+lemma topRawC_bi_sound (reject : ℕ → ℕ → ℕ → List W → Bool) (valid : RejectSound true R m T reject) (hR : RR R) (hR2 : ∀ d a b, (R a = 0 ∨ R b = 0) → Al R d a b)
     {K k t z H : ℕ} {v : List W} {S S1 : Finset ℕ}
-    (h : topRawC l m g K H 0 k t z v = false)
+    (h : topRawC reject l m g K H 0 k t z v = false)
     (hs : StOk P T l k z v S) (hcod : ∀ w ∈ v, w.r = R w.s)
     {k0 a b : ℕ} {d : Bool} (hk : k0+1 ≤ k) (hl : Live Z0 m T (k0+1) t S)
     (ha : R a ≠ 0) (hb' : R b ≠ 0) (hb0 : Bi Z0 d a b S S1) (hTail : Live Z0 m T k0 t S1)
@@ -4763,13 +4771,13 @@ lemma topRawC_bi_sound (hR : RR R) (hR2 : ∀ d a b, (R a = 0 ∨ R b = 0) → A
   have un : tst (pos' t) l (k + 1 - t) v (fun y =>
       Bool.rec (motive := fun _ => Bool) (Bool.rec (motive := fun _ => Bool) false
         (mvRaw true (lookRaw true l m g K) l m g k t z v y) (Nat.beq 0 1)) true
-      (node (look1Raw true l m g K K (k - 1) t) (pos' t) l m g (k - t - y) v.length z v
+      (node (look1Raw reject true l m g K K (k - 1) t) (pos' t) l m g (k - t - y) v.length z v
         (fun f xs => pairsC H f (fs xs)))) = false := by
     change (Bool.rec (motive := fun _ => Bool)
       (tst (pos t) l (k + 1 - t) v (fun y =>
         Bool.rec (motive := fun _ => Bool) (Bool.rec (motive := fun _ => Bool) false
            (mvRaw true (lookRaw true l m g K) l m g k t z v y) (Nat.beq 0 1)) true
-        (node (look1Raw true l m g K K (k - 1) t) (pos t) l m g (k - t - y) v.length z v
+        (node (look1Raw reject true l m g K K (k - 1) t) (pos t) l m g (k - t - y) v.length z v
           (fun f xs => pairsC H f (fs xs))))) true (Nat.ble v.length 1) : Bool) = false at h
     rw [bR, pos_eq] at h
     cases h0 : Nat.ble v.length 1 with
@@ -4780,7 +4788,7 @@ lemma topRawC_bi_sound (hR : RR R) (hR2 : ∀ d a b, (R a = 0 ∨ R b = 0) → A
   obtain ⟨y,hFy,hyk⟩ := tst_sound X hs hmin hk
   have hthen := (hFy _).symm.trans un
   have hnode := (or_false' X hthen).1
-  refine oneRaw_bi_sound X true hR hR2 (K := K) (f := look1Raw true l m g K K) (look1Raw_sound X true hR hR2 (K := K) K)
+  refine oneRaw_bi_sound X true hR hR2 (K := K) (f := look1Raw reject true l m g K K) (look1Raw_sound X reject true valid hR hR2 (K := K) K)
       hs hcod hk hl ha hb' hb0 hTail hmW ready hyk ?_
   intro wa hwa wb hwb ea eb hne har hcr
   refine ⟨_,hnode,fun f' hp => ?_⟩
@@ -4798,7 +4806,8 @@ end
 
 set_option maxHeartbeats 0 in
 theorem imp_of_bi {Q : List (ℕ × ℕ)} {Z L k0 t H a b : ℕ} {d : Bool}
-    {S S1 : Finset ℕ} (hp : pOk Z Q = true) (hL : L ≤ 15)
+    {S S1 : Finset ℕ} {reject : ℕ → ℕ → ℕ → List W → Bool} (valid : RejectSound true (RZ [] Z) (mz Z) (tz Z) reject)
+    (hp : pOk Z Q = true) (hL : L ≤ 15)
     (hI : ∀ e ∈ Q, Imp [] e.1 e.2)
     (hk : k0+1 < L) (hS : (S : Set ℕ) ⊆ C (mz Z) (WZ [] Z))
     (hl : Live Z0 (mz Z) (tz Z) (k0+1) t S)
@@ -4808,7 +4817,7 @@ theorem imp_of_bi {Q : List (ℕ × ℕ)} {Z L k0 t H a b : ℕ} {d : Bool}
     (hmin : ∀ q < k0+1, ¬ Sol Z0 (mz Z) (tz Z) q (C (mz Z) (WZ [] Z)))
     (excludeRaw : ∀ a ∈ WZ [] Z, ∀ n < k0+1, ∀ V : Finset ℕ,
       (V : Set ℕ) ⊆ insert (a ^^^ mz Z) (C (mz Z) (WZ [] Z)) → Live Z0 (mz Z) (tz Z) n 0 V → False)
-    (ht1 : t ≤ 1) (hchk : chkRaw [] Q Z (L-1) t H 0 = false) : False := by
+    (ht1 : t ≤ 1) (hchk : chkRaw reject [] Q Z (L-1) t H 0 = false) : False := by
   simp only [pOk, Bool.and_eq_true, Bool.not_eq_true', List.all_eq_true] at hp
   obtain ⟨⟨hp0, hp1⟩, hp2⟩ := hp
   have nb : ∀ {x y : ℕ}, Nat.beq x y = false → x ≠ y := fun h e => by rw [e, Nat.beq_refl] at h; simp at h
@@ -4907,13 +4916,13 @@ theorem imp_of_bi {Q : List (ℕ × ℕ)} {Z L k0 t H a b : ℕ} {d : Bool}
   have hble : Nat.ble v.length (Nat.sub (Nat.succ (L - 1)) t) = true := Nat.ble_eq_true_of_le (by
     change v.length ≤ L - 1 + 1 - t; omega)
   have hhas : hasP (pwr [] Z) v = true := hasP_ok (hpw.imp id fun h => hrep.mem.1 h)
-  have top : topRawC (lz Z) (mz Z) (pL (Q.map fun _ => 16)) (L - 1) H 0 (L - 1) t
+  have top : topRawC reject (lz Z) (mz Z) (pL (Q.map fun _ => 16)) (L - 1) H 0 (L - 1) t
       (pL (Q.map fun e => 16 + (L - 1 - e.2)) - sumc v) v = false := by
     have h2 := hchk
     simp only [chkRaw, frc_eq, st_eq] at h2
     have h3 := anySub_false (by simp) h2 v hsub hcov
     simp only [startRawvC, bR, hhas, hble, Bool.cond_true] at h3
-    exact child_sound X (f := fun z r => topRawC (lz Z) (mz Z) _ (L - 1) H 0 (L - 1) t z r)
+    exact child_sound X (f := fun z r => topRawC reject (lz Z) (mz Z) _ (L - 1) H 0 (L - 1) t z r)
       (fun h => rfl) hst hm (by omega) h3
   have haR : RZ [] Z a ≠ 0 := by rw [← RZ_set] at ha; exact ha
   have hbR : RZ [] Z b ≠ 0 := by rw [← RZ_set] at hwB; exact hwB
@@ -4930,7 +4939,7 @@ theorem imp_of_bi {Q : List (ℕ × ℕ)} {Z L k0 t H a b : ℕ} {d : Bool}
     · exact Or.inr (Or.inl raw)
     · exact Or.inr (Or.inl (hSW hs))
     · exact Or.inr (Or.inr constant)
-  refine topRawC_bi_sound X (RZ_R [] Z) (RZ_R2 [] Z) top hst hcod (by omega) hl
+  refine topRawC_bi_sound X reject valid (RZ_R [] Z) (RZ_R2 [] Z) top hst hcod (by omega) hl
     haR hbR bi tail hash ready ?_
   intro q hq hs
   rw [RZ_set] at hs
@@ -6161,9 +6170,9 @@ lemma binaryOrbit : ∀ i j : Fin 8, i ≠ j →
 
 lemma unaryOrbit : ∀ i : Fin 8, ∃ a : Fin 4, (permuted a i).val ∈ unaryRepresentatives := by decide +kernel
 
-def BinaryCertificates (Q : List (ℕ × ℕ)) : Prop :=
+def BinaryCertificates (reject : ℕ → ℕ → ℕ → List W → Bool) (Q : List (ℕ × ℕ)) : Prop :=
     ∀ p ∈ binaryRepresentatives, ∃ H : ℕ,
-      hb H (sampleWire p.1 + sampleWire p.2) = true ∧ chkRaw [] Q 0 14 1 H 0 = false
+      hb H (sampleWire p.1 + sampleWire p.2) = true ∧ chkRaw reject [] Q 0 14 1 H 0 = false
 
 def UnaryCertificates : Prop :=
     ∀ (i : Fin 8), i.val ∈ unaryRepresentatives →
@@ -6201,9 +6210,10 @@ lemma sampleUnaryBySymmetry (certs : UnaryCertificates) (i : Fin 8) {n : ℕ} (h
   · exact Or.inr (initial ⟨w',stock,rfl⟩)
 
 set_option maxHeartbeats 0 in
-lemma projectBinary {Q : List (ℕ × ℕ)} (pQ : pOk 0 Q = true)
+lemma projectBinary {Q : List (ℕ × ℕ)} {reject : ℕ → ℕ → ℕ → List W → Bool}
+    (valid : RejectSound true (RZ [] 0) (mz 0) (tz 0) reject) (pQ : pOk 0 Q = true)
     (lowerQ : ∀ e ∈ Q, Imp [] e.1 e.2) (lower : Imp [] 0 14)
-    (certs : BinaryCertificates Q) (unary : UnaryCertificates)
+    (certs : BinaryCertificates reject Q) (unary : UnaryCertificates)
     {d : Bool} {i j : Fin 8} (hij : i ≠ j) (U : Finset ℕ) (hU : (U : Set ℕ) ⊆ C fullMask fullStock)
     (tail : Live Z0 fullMask fullTarget 13 1 (insert (op d (fullWire i) (fullWire j)) U)) :
     False := by
@@ -6263,7 +6273,7 @@ lemma projectBinary {Q : List (ℕ × ℕ)} (pQ : pOk 0 Q = true)
   have hNot : t = 1 := by omega
   subst k
   subst t
-  refine imp_of_bi (L := 15) pQ (by decide) lowerQ (by decide) hS hNew hx hy
+  refine imp_of_bi (L := 15) valid pQ (by decide) lowerQ (by decide) hS hNew hx hy
     ⟨hne,U',rfl,rfl,al0 _ _ _⟩ hTail hash (fun _ h => lower _ h) ?_ (by decide) hchk
   intro a ha n hn V hV hl
   obtain ⟨i, rfl⟩ := sampleWire_covers ha
@@ -6284,9 +6294,10 @@ lemma projectUnary (certs : UnaryCertificates) {i : Fin 8} (U : Finset ℕ)
   · exact Or.inr (pull_initial a ⟨w,hU hw,rfl⟩)
 
 set_option maxHeartbeats 0 in
-theorem fullExclusion {Q : List (ℕ × ℕ)} (pQ : pOk 0 Q = true)
+theorem fullExclusion {Q : List (ℕ × ℕ)} {reject : ℕ → ℕ → ℕ → List W → Bool}
+    (valid : RejectSound true (RZ [] 0) (mz 0) (tz 0) reject) (pQ : pOk 0 Q = true)
     (lowerQ : ∀ e ∈ Q, Imp [] e.1 e.2) (lower : Imp [] 0 14)
-    (bin : BinaryCertificates Q) (un : UnaryCertificates)
+    (bin : BinaryCertificates reject Q) (un : UnaryCertificates)
     {S : Finset ℕ} (hS : (S : Set ℕ) ⊆ C fullMask fullStock)
     (live : Live Z0 fullMask fullTarget 14 1 S) : False := by
   have min : Min Z0 fullMask fullTarget 14 1 S := ⟨live, fun q hq proof =>
@@ -6309,7 +6320,7 @@ theorem fullExclusion {Q : List (ℕ × ℕ)} (pQ : pOk 0 Q = true)
   | @bi _ _ d a b U hab hal tail =>
     obtain ⟨i,hi⟩ := fullStock_rows (real a (by simp))
     obtain ⟨j,hj⟩ := fullStock_rows (real b (by simp))
-    refine projectBinary pQ lowerQ lower bin un (d := d) (i := i) (j := j) ?_ U (fun _ hu => hS (by simp [hu])) ?_
+    refine projectBinary valid pQ lowerQ lower bin un (d := d) (i := i) (j := j) ?_ U (fun _ hu => hS (by simp [hu])) ?_
     · intro he
       exact hab (hi.trans (he ▸ hj.symm))
     · rw [← hi, ← hj]
@@ -6613,18 +6624,18 @@ lemma look1C_step (nn aa hx hy l m g K fuel k t z : ℕ) (v : List W) :
   simp only [bR]
 
 
-lemma look1RawC_step (nn aa hx hy l m g K fuel k t z : ℕ) (v : List W) :
-    look1RawC nn aa hx hy true l m g K fuel.succ k t z v =
-      (bif Nat.ble v.length 1 then true else
+lemma look1RawC_step (reject : ℕ → ℕ → ℕ → List W → Bool) (nn aa hx hy l m g K fuel k t z : ℕ) (v : List W) :
+    look1RawC reject nn aa hx hy true l m g K fuel.succ k t z v =
+      (bif reject k t z v then false else bif Nat.ble v.length 1 then true else
         tstC nn aa hx hy (pos t) l (Nat.sub (Nat.succ k) t) v (fun y =>
-          bif nodeC nn (look1RawC nn aa hx hy true l m g K fuel (Nat.sub k 1) t) (pos t)
+          bif nodeC nn (look1RawC reject nn aa hx hy true l m g K fuel (Nat.sub k 1) t) (pos t)
             l m g (Nat.sub (Nat.sub k t) y) v.length z v pairsS then true
           else mvRawC nn aa hx hy true (lookRawC nn aa hx hy true l m g K) l m g k t z v y)) := by
-  change Bool.rec (motive := fun _ => Bool)
+  change (bif reject k t z v then false else Bool.rec (motive := fun _ => Bool)
       (tstC nn aa hx hy (pos t) l (Nat.sub (Nat.succ k) t) v (fun y =>
         Bool.rec (motive := fun _ => Bool) (mvRawC nn aa hx hy true (lookRawC nn aa hx hy true l m g K) l m g k t z v y) true
-          (nodeC nn (look1RawC nn aa hx hy true l m g K fuel (Nat.sub k 1) t) (pos t)
-            l m g (Nat.sub (Nat.sub k t) y) v.length z v pairsS))) true (Nat.ble v.length 1) = _
+          (nodeC nn (look1RawC reject nn aa hx hy true l m g K fuel (Nat.sub k 1) t) (pos t)
+            l m g (Nat.sub (Nat.sub k t) y) v.length z v pairsS))) true (Nat.ble v.length 1)) = _
   simp only [bR]
 
 
@@ -6723,12 +6734,1082 @@ noncomputable def initialBinary (H : ℕ) (kind : Bool) (f : ℕ → List W → 
   nodePicked I.NN f true I.AA rootPreparedMask rootPreparedSlots 13 8
     (Nat.sub rootPreparedBudget (sumc rootPreparedWords)) rootPreparedWords H kind
 
+abbrev SearchState := ℕ × List W
+
+-- A renaming that is injective on the generated signals preserves the exact live stock.
+lemma Live.renameOn {m T k t : ℕ} {S : Finset ℕ} (live : Live Z0 m T k t S)
+    {D : Set ℕ} (inside : (S : Set ℕ) ⊆ D)
+    (closedNeg : ∀ a ∈ D, a ^^^ m ∈ D)
+    (closedOp : ∀ d a b, a ∈ D → b ∈ D → op d a b ∈ D)
+    (f : ℕ → ℕ) (injective : Set.InjOn f D) (target : f T = T)
+    (neg : ∀ a, f (a ^^^ m) = f a ^^^ m)
+    (bin : ∀ d a b, f (op d a b) = op d (f a) (f b)) :
+    Live Z0 m T k t (S.image f) := by
+  induction live with
+  | stop => simpa [Finset.image_singleton, target] using (Live.stop (R := Z0) (m := m) (T := T))
+  | @un k t a U next ih =>
+    have fromD : ((insert (a ^^^ m) U : Finset ℕ) : Set ℕ) ⊆ D := by
+      intro x hx
+      simp only [Finset.mem_coe, Finset.mem_insert] at hx
+      rcases hx with rfl | hx
+      · exact closedNeg a (inside (by simp))
+      · exact inside (by simp [hx])
+    rw [Finset.image_insert]
+    refine Live.un ?_
+    simpa only [Finset.image_insert, neg] using ih fromD
+  | @bi k t d a b U distinct _ next ih =>
+    have aD : a ∈ D := inside (by simp)
+    have bD : b ∈ D := inside (by simp)
+    have fromD : ((insert (op d a b) U : Finset ℕ) : Set ℕ) ⊆ D := by
+      intro x hx
+      simp only [Finset.mem_coe, Finset.mem_insert] at hx
+      rcases hx with rfl | hx
+      · exact closedOp d a b aD bD
+      · exact inside (by simp [hx])
+    rw [Finset.image_insert, Finset.image_insert]
+    refine Live.bi (d := d) (fun eq => distinct (injective aD bD eq)) (al0 _ _ _) ?_
+    simpa only [Finset.image_insert, bin] using ih fromD
+
+abbrev rotateSample (a : Fin 4) := cofactorPull 0 rootSamplePositions a
+
+lemma rotation_target (a : Fin 4) : rotateSample a (tz 0) = tz 0 :=
+  (cofactorMaps sampleMaskBound (rootSampleAlignment a) EF_ok EF_ok).1
+
+lemma rotation_neg (a : Fin 4) (w : ℕ) :
+    rotateSample a (w ^^^ mz 0) = rotateSample a w ^^^ mz 0 :=
+  (cofactorMaps sampleMaskBound (rootSampleAlignment a) EF_ok EF_ok).2.1 w
+
+lemma rotation_op (a : Fin 4) (d : Bool) (w w' : ℕ) :
+    rotateSample a (op d w w') = op d (rotateSample a w) (rotateSample a w') :=
+  (cofactorMaps sampleMaskBound (rootSampleAlignment a) EF_ok EF_ok).2.2.1 d w w'
+
+lemma rotation_wire (a : Fin 4) (i : Fin 8) :
+    rotateSample a (sampleWire i.val) = sampleWire (permuted a i).val :=
+  (cofactorMaps sampleMaskBound (rootSampleAlignment a) EF_ok EF_ok).2.2.2.2 i
+
+lemma rotation_zero (a : Fin 4) : rotateSample a 0 = 0 := by
+  apply Nat.eq_of_testBit_eq
+  intro k
+  change (cofactorPull 0 rootSamplePositions a 0).testBit k = _
+  rw [cofactorPull_bit sampleMaskBound]
+  simp
+
+lemma rotation_mask (a : Fin 4) : rotateSample a (mz 0) = mz 0 := by
+  simpa only [Nat.zero_xor, rotation_zero] using rotation_neg a 0
+
+inductive SampleSignal : ℕ → Prop where
+  | raw (i : Fin 8) : SampleSignal (sampleWire i.val)
+  | zero : SampleSignal 0
+  | full : SampleSignal (mz 0)
+  | neg {w : ℕ} : SampleSignal w → SampleSignal (w ^^^ mz 0)
+  | gate {w w' : ℕ} (d : Bool) : SampleSignal w → SampleSignal w' → SampleSignal (op d w w')
+
+lemma rotation_involutive_on {w : ℕ} (a : Fin 4) (generated : SampleSignal w) :
+    rotateSample a (rotateSample a w) = w := by
+  have permutes : ∀ i : Fin 8, permuted a (permuted a i) = i := by
+    fin_cases a <;> decide
+  induction generated with
+  | raw i => simp only [rotation_wire, permutes]
+  | zero => simp only [rotation_zero]
+  | full => simp only [rotation_mask]
+  | neg _ ih => simp only [rotation_neg, ih]
+  | gate d _ _ ih₁ ih₂ => simp only [rotation_op, ih₁, ih₂]
+
+lemma rotation_injective (a : Fin 4) : Set.InjOn (rotateSample a) {w | SampleSignal w} := by
+  intro x hx y hy he
+  have same := congrArg (rotateSample a) he
+  rwa [rotation_involutive_on a hx, rotation_involutive_on a hy] at same
+
+lemma rotation_bank (a : Fin 4) {x : ℕ} (hx : x ∈ WZ [] 0) : rotateSample a x ∈ WZ [] 0 := by
+  obtain ⟨i, rfl⟩ := sampleWire_covers hx
+  rw [rotation_wire]
+  exact sampleWire_ok (permuted a i)
+
+set_option maxRecDepth 100000 in
+lemma Live.rotateStock {k t : ℕ} {S : Finset ℕ} (live : Live Z0 (mz 0) (tz 0) k t S)
+    (inside : ∀ x ∈ S, SampleSignal x) (a : Fin 4) :
+    Live Z0 (mz 0) (tz 0) k t (S.image (rotateSample a)) :=
+  live.renameOn (D := {w | SampleSignal w}) (fun x hx => inside x hx)
+    (fun _ hx => SampleSignal.neg hx) (fun d _ _ hx hy => SampleSignal.gate d hx hy)
+    (rotateSample a) (rotation_injective a) (rotation_target a) (rotation_neg a) (rotation_op a)
+
+lemma bankSampleSignal {x : ℕ} (hx : x ∈ WZ [] 0) : SampleSignal x := by
+  obtain ⟨i,rfl⟩ := sampleWire_covers hx
+  exact SampleSignal.raw i
+
+lemma rotation_generated {x : ℕ} (a : Fin 4) (hx : SampleSignal x) : SampleSignal (rotateSample a x) := by
+  induction hx with
+  | raw i => rw [rotation_wire]; exact SampleSignal.raw (permuted a i)
+  | zero => rw [rotation_zero]; exact SampleSignal.zero
+  | full => rw [rotation_mask]; exact SampleSignal.full
+  | neg _ ih => rw [rotation_neg]; exact SampleSignal.neg ih
+  | gate d _ _ ih₁ ih₂ => rw [rotation_op]; exact SampleSignal.gate d ih₁ ih₂
+
+def rotationStock (a : Fin 4) (S : Finset ℕ) := S.image (rotateSample a)
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+lemma rotateAvailable (a : Fin 4) {S : Finset ℕ}
+    (inside : ∀ x ∈ S, SampleSignal x) {x : ℕ}
+    (available : x ∈ C (mz 0) (WZ [] 0 ∪ (rotationStock a S : Set ℕ))) :
+    rotateSample a x ∈ C (mz 0) (WZ [] 0 ∪ (S : Set ℕ)) := by
+  rcases available with (raw | stock) | constant
+  · exact Or.inl (Or.inl (rotation_bank a raw))
+  · obtain ⟨original, member, rfl⟩ := Finset.mem_image.mp stock
+    rw [rotation_involutive_on a (inside original member)]
+    exact Or.inl (Or.inr member)
+  · simp only [Set.mem_insert_iff, Set.mem_singleton_iff] at constant
+    rcases constant with rfl | rfl
+    · rw [rotation_zero]; exact Or.inr (Set.mem_insert _ _)
+    · rw [rotation_mask]; exact Or.inr (Set.mem_insert_of_mem _ rfl)
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+lemma rotatedStockGenerated (a : Fin 4) {S : Finset ℕ}
+    (inside : ∀ x ∈ S, SampleSignal x) {x : ℕ}
+    (available : x ∈ C (mz 0) (WZ [] 0 ∪ (rotationStock a S : Set ℕ))) : SampleSignal x := by
+  rcases available with (raw | stock) | constant
+  · exact bankSampleSignal raw
+  · obtain ⟨original, member, rfl⟩ := Finset.mem_image.mp stock
+    exact rotation_generated a (inside original member)
+  · simp only [Set.mem_insert_iff, Set.mem_singleton_iff] at constant
+    rcases constant with rfl | rfl
+    · exact SampleSignal.zero
+    · exact SampleSignal.full
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+lemma rotateShortExclusion (a : Fin 4) {S : Finset ℕ} {k : ℕ}
+    (inside : ∀ x ∈ S, SampleSignal x)
+    (short : ∀ q < k, ¬ Sol Z0 (mz 0) (tz 0) q (C (mz 0) ({x | RZ [] 0 x ≠ 0} ∪ (S : Set ℕ)))) :
+    ∀ q < k, ¬ Sol Z0 (mz 0) (tz 0) q (C (mz 0) ({x | RZ [] 0 x ≠ 0} ∪ (rotationStock a S : Set ℕ))) := by
+  rw [RZ_set] at short ⊢
+  intro q hq sol
+  have renamed := sol.mapSignals (rotateSample a) (rotation_target a) (rotation_neg a) (rotation_op a)
+  apply short q hq (renamed.mono le_rfl ?_)
+  intro w h
+  obtain ⟨x,hx,eq⟩ := h
+  rw [← eq]
+  exact rotateAvailable a inside hx
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+lemma rotateRawMode (a : Fin 4) {S : Finset ℕ} {k t : ℕ}
+    (inside : ∀ x ∈ S, SampleSignal x)
+    (ready : RawMode true (RZ [] 0) (mz 0) (tz 0) k t S) :
+    RawMode true (RZ [] 0) (mz 0) (tz 0) k t (rotationStock a S) := by
+  obtain ⟨limit,exclusion⟩ := ready rfl
+  intro _
+  refine ⟨limit, fun ht => ?_⟩
+  have source := exclusion ht
+  unfold RawNegExcluded at source ⊢
+  intro x hraw n hn V available live
+  have xBank : x ∈ WZ [] 0 := by
+    rw [← RZ_set]
+    exact hraw
+  have rotatedRaw : RZ [] 0 (rotateSample a x) ≠ 0 := by
+    have bank := rotation_bank a xBank
+    rw [← RZ_set] at bank
+    exact bank
+  rw [RZ_set] at source available
+  have gen (w : ℕ) (hw : w ∈ V) : SampleSignal w := by
+    rcases available hw with eq | stock
+    · rw [eq]; exact SampleSignal.neg (bankSampleSignal xBank)
+    · exact rotatedStockGenerated a inside stock
+  refine source _ rotatedRaw n hn (rotationStock a V) ?_ (live.rotateStock gen a)
+  intro w hw
+  obtain ⟨old, mem, rfl⟩ := Finset.mem_image.mp hw
+  rcases available mem with rfl | stock
+  · exact Or.inl (rotation_neg a x)
+  · exact Or.inr (rotateAvailable a inside stock)
+
+structure InputGate where
+  disj : Bool
+  left : W
+  right : W
+
+def InputGate.output (g : InputGate) : W := opW g.disj g.left g.right
+
+def InputGate.eliminated (g : InputGate) (j : ℕ) : Bool :=
+  (g.left.c ||| g.right.c).testBit (5*j)
+
+def projectedCost (gates : List InputGate) (j : ℕ) : ℕ :=
+  (gates.filter fun gate => !(gate.eliminated j)).length
+
+def gateProjection (mask : ℕ) (gates : List InputGate) : Set ℕ :=
+  {x | ∃ gate ∈ gates, x = gate.output.s &&& mask}
+
+lemma extendCofactor {P : List ℕ} {T q j : ℕ} (valid : j < P.length)
+    (gates : List InputGate) {bank : Set ℕ}
+    (facts : ∀ g ∈ gates, WOk P g.left ∧ WOk P g.right ∧ g.left.s ∈ bank ∧ g.right.s ∈ bank)
+    {base : Set ℕ} (lift : ∀ x ∈ bank, x &&& P.getD j 0 ∈ base)
+    (zero : 0 ∈ base) (mask : P.getD j 0 ∈ base)
+    (sol : Sol Z0 (P.getD j 0) T q (base ∪ gateProjection (P.getD j 0) gates)) :
+    Sol Z0 (P.getD j 0) T (q + projectedCost gates j) base := by
+  induction gates generalizing base with
+  | nil => simpa [gateProjection, projectedCost] using sol
+  | cons g rest ih =>
+    have root := facts g (by simp)
+    have remaining : ∀ gate ∈ rest, WOk P gate.left ∧ WOk P gate.right ∧ gate.left.s ∈ bank ∧ gate.right.s ∈ bank :=
+      fun gate h => facts gate (by simp [h])
+    have generated : g.output.s &&& P.getD j 0 =
+        op g.disj (g.left.s &&& P.getD j 0) (g.right.s &&& P.getD j 0) := by
+      rw [InputGate.output, opW_s, and_op]
+    have includeHead {B : Set ℕ} (baseSub : base ⊆ B) (head : g.output.s &&& P.getD j 0 ∈ B) :
+        base ∪ gateProjection (P.getD j 0) (g :: rest) ⊆ B ∪ gateProjection (P.getD j 0) rest := by
+      rintro x (h | ⟨gate,h,rfl⟩)
+      · exact Or.inl (baseSub h)
+      · rcases List.mem_cons.mp h with rfl | inside
+        · exact Or.inl head
+        · exact Or.inr ⟨gate,inside,rfl⟩
+    cases saved : g.eliminated j
+    · have tail := sol.mono le_rfl (includeHead (B := insert (g.output.s &&& P.getD j 0) base)
+        (Set.subset_insert _ _) (Set.mem_insert _ _))
+      have next := ih remaining (fun x h => Set.mem_insert_of_mem _ (lift x h))
+        (Set.mem_insert_of_mem _ zero) (Set.mem_insert_of_mem _ mask) tail
+      rw [generated] at next
+      have one := Sol.bi (d := g.disj) (lift _ root.2.2.1) (lift _ root.2.2.2) (al0 _ _ _) next
+      simpa [projectedCost, saved, Nat.add_assoc] using one
+    · have constant : Cst (P.getD j 0) g.left.s ∨ Cst (P.getD j 0) g.right.s := by
+        simp only [InputGate.eliminated, Nat.testBit_or, Bool.or_eq_true] at saved
+        exact saved.elim (fun h => Or.inl (root.1.cst valid h)) (fun h => Or.inr (root.2.1.cst valid h))
+      have present : g.output.s &&& P.getD j 0 ∈ base := by
+        rw [InputGate.output,opW_s]
+        rcases constant with ha | hb
+        · rcases op_cst (b := g.right.s) g.disj ha with h | h | h <;> rw [h]
+          · exact zero
+          · exact mask
+          · exact lift _ root.2.2.2
+        · rw [op_comm]
+          rcases op_cst (b := g.left.s) g.disj hb with h | h | h <;> rw [h]
+          · exact zero
+          · exact mask
+          · exact lift _ root.2.2.1
+      have next := ih remaining lift zero mask (sol.mono le_rfl (includeHead subset_rfl present))
+      simpa [projectedCost, saved] using next
+
+lemma stock_cofactor_facts (j : ℕ) (hj : j < (PZ rootBounds).length) :
+    (PZ rootBounds).getD j 0 = mz (rootBounds.getD j (0,14)).1 ∧
+    rootBounds.getD j (0,14) ∈ rootBounds := by
+  simp only [PZ, List.length_map] at hj
+  simp [PZ, List.getD_eq_getElem?_getD, List.getElem?_map, List.getElem?_eq_getElem hj]
+
+lemma rootCofactorValid (e : ℕ × ℕ) (he : e ∈ rootBounds) :
+    mz e.1 &&& mz 0 = mz e.1 ∧ tz e.1 ≠ 0 ∧ tz e.1 ≠ mz e.1 := by
+  have h := rootBounds_p
+  simp only [pOk, Bool.and_eq_true, List.all_eq_true] at h
+  obtain ⟨⟨a,b⟩,c⟩ := h.2 e he
+  exact ⟨Nat.eq_of_beq_eq_true a, fun eq => by simp [eq] at b, fun eq => by simp [eq] at c⟩
+
+lemma rootWordFacts (w : W) (h : w ∈ rootPreparedWords) :
+    WOk (PZ rootBounds) w ∧ Good I.AA w.s ∧ w.s ∈ WZ [] 0 ∧ w.r = 3 := by
+  rw [← rootPreparedWords_eq] at h
+  obtain ⟨_,members,_⟩ := avl_spec (PZ rootBounds) (mz 0) (rawL [])
+  obtain ⟨raw, member, rfl⟩ := members w h
+  have empty : ∀ e ∈ ([] : List (ℕ × ℕ)), e ∈ six := by simp
+  refine ⟨mkW_ok _ _, ?_, ⟨raw,member,rfl⟩,rfl⟩
+  rw [← rootPreparedL_eq]
+  exact wire_good (rawL_sub empty member) 0
+
+lemma initialGateFacts (g : InputGate)
+    (hl : g.left ∈ rootPreparedWords) (hr : g.right ∈ rootPreparedWords) :
+    WOk (PZ rootBounds) g.output ∧ Good I.AA g.output.s := by
+  have left := rootWordFacts _ hl
+  have right := rootWordFacts _ hr
+  refine ⟨opW_ok _ left.1 right.1, ?_⟩
+  rw [InputGate.output, opW_s]
+  exact op_good _ left.2.1 right.2.1
+
+lemma cofactorBudget_sound (k : ℕ) (gates : List InputGate)
+    (support : ∀ g ∈ gates, g.left ∈ rootPreparedWords ∧ g.right ∈ rootPreparedWords)
+    {S : Finset ℕ} (covered : ∀ x ∈ S, x ∈ WZ [] 0 ∨ ∃ g ∈ gates, x = g.output.s) :
+    Cl (PZ rootBounds) (tz 0) k
+      (fun j => k + projectedCost gates j - (rootBounds.getD j (0,14)).2) S := by
+  intro j hj q hq sol
+  obtain ⟨maskEq, member⟩ := stock_cofactor_facts j hj
+  let e := rootBounds.getD j (0,14)
+  have valid := (rootCofactorValid e member).1
+  have raw (x : ℕ) (hx : x ∈ WZ [] 0) : x &&& (PZ rootBounds).getD j 0 ∈ C (mz e.1) (WZ [] e.1) := by
+    rw [maskEq]
+    obtain ⟨w, hw, rfl⟩ := hx
+    apply Or.inl
+    refine ⟨w, hw, ?_⟩
+    rw [Nat.and_assoc, Nat.and_comm (mz 0), valid]
+  have axes : tz 0 &&& (PZ rootBounds).getD j 0 = tz e.1 := by
+    rw [maskEq]; exact tz_sub valid
+  rw [axes] at sol
+  apply rootBounds_I e member (q + projectedCost gates j) (by change q + (k + projectedCost gates j - e.2) < k at hq; omega)
+  have zero : 0 ∈ C (mz e.1) (WZ [] e.1) := by simp [C]
+  have top : (PZ rootBounds).getD j 0 ∈ C (mz e.1) (WZ [] e.1) := by
+    rw [maskEq]
+    exact Or.inr (Set.mem_insert_of_mem _ rfl)
+  have available : ∀ g ∈ gates, WOk (PZ rootBounds) g.left ∧ WOk (PZ rootBounds) g.right ∧
+      g.left.s ∈ WZ [] 0 ∧ g.right.s ∈ WZ [] 0 := by
+    intro g hg
+    have hl := rootWordFacts _ (support g hg).1
+    have hr := rootWordFacts _ (support g hg).2
+    exact ⟨hl.1,hr.1,hl.2.2.1,hr.2.2.1⟩
+  have extension := extendCofactor (T := tz e.1) (q := q) hj gates available raw zero top
+  rw [maskEq] at extension sol
+  apply extension (sol.mono le_rfl ?_)
+  rintro x (⟨y,hy,rfl⟩ | constant)
+  · rcases covered y hy with old | ⟨g,hg,rfl⟩
+    · exact Or.inl (by simpa only [maskEq] using raw y old)
+    · exact Or.inr ⟨g,hg,rfl⟩
+  · exact Or.inl (Or.inr constant)
+
+lemma rootStockContext : Ctx (PZ rootBounds) I.AA (mz 0) rootPreparedSlots (tz 0) := by
+  refine ⟨fun i hi => lz_lg 0 i (by rwa [rootPreparedL_eq]), ?_, ?_⟩
+  · intro j hj
+    obtain ⟨eq,member⟩ := stock_cofactor_facts j hj
+    have h := rootCofactorValid _ member
+    rw [eq, tz_sub h.1]
+    exact h
+  · rw [← rootPreparedSlots_eq, pL_pk]
+    simp only [PZ, List.length_map]
+    refine pk_congr fun j hj => ?_
+    rw [List.getD_eq_getElem?_getD, List.getElem?_map, List.getElem?_eq_getElem hj]
+    rfl
+
+noncomputable def canonicalStock (inputs : List W) (gates : List InputGate) : List W :=
+  gates.foldr (fun g stock => addS g.output stock) inputs
+
+lemma canonicalStock_support {v : List W} (sorted : Srt v) (gates : List InputGate) :
+    Srt (canonicalStock v gates) ∧
+    ∀ w ∈ canonicalStock v gates, w ∈ v ∨ ∃ g ∈ gates, w = g.output := by
+  induction gates with
+  | nil => exact ⟨sorted, fun _ h => Or.inl h⟩
+  | cons g rest ih =>
+    obtain ⟨h, present, _, _⟩ := addS_spec (o := g.output) ih.1
+    refine ⟨h, fun w member => ?_⟩
+    rcases present w member with rfl | hm
+    · exact Or.inr ⟨g,by simp,rfl⟩
+    · rcases ih.2 w hm with raw | ⟨gate, found, eq⟩
+      · exact Or.inl raw
+      · exact Or.inr ⟨gate,by simp [found],eq⟩
+
+def canonicalSlot (k : ℕ) (gates : List InputGate) (j : ℕ) : ℕ :=
+  k + projectedCost gates j - (rootBounds.getD j (0,14)).2
+
+def canonicalBudget (k : ℕ) (gates : List InputGate) (v : List W) : ℕ :=
+  pL ((List.range rootBounds.length).map fun j => 16 + canonicalSlot k gates j) - sumc v
+
+lemma cnt_length_le (v : List W) (j : ℕ) : cnt v j ≤ v.length := by
+  induction v with
+  | nil => rfl
+  | cons w rest ih =>
+    rw [cnt_cons, List.length_cons]
+    have bound := fl_le w j
+    omega
+
+lemma rootCanonicalState {v : List W} {S : Finset ℕ} (rep : Rep v S)
+    (k : ℕ) (gates : List InputGate) (cap : k + gates.length ≤ 14) (len : v.length ≤ 15)
+    (sources : ∀ g ∈ gates, g.left ∈ rootPreparedWords ∧ g.right ∈ rootPreparedWords)
+    (everyWire : ∀ w ∈ v, w ∈ rootPreparedWords ∨ ∃ g ∈ gates, w = g.output) :
+    StOk (PZ rootBounds) (tz 0) I.AA k (canonicalBudget k gates v) v S := by
+  have good (w : W) (hw : w ∈ v) : WOk (PZ rootBounds) w ∧ Good I.AA w.s := by
+    rcases everyWire _ hw with raw | ⟨g,hg,rfl⟩
+    · have h := rootWordFacts w raw
+      exact ⟨h.1,h.2.1⟩
+    · exact initialGateFacts g (sources g hg).1 (sources g hg).2
+  have covered (w : ℕ) (mem : w ∈ S) : w ∈ WZ [] 0 ∨ ∃ g ∈ gates, w = g.output.s := by
+    obtain ⟨s,hs,rfl⟩ := rep.mem.1 mem
+    rcases everyWire s hs with raw | ⟨g,hg,rfl⟩
+    · exact Or.inl (rootWordFacts _ raw).2.2.1
+    · exact Or.inr ⟨g,hg,rfl⟩
+  refine ⟨rep, fun w hw => (good w hw).1, fun w hw => (good w hw).2,
+    canonicalSlot k gates, ?_, cofactorBudget_sound k gates sources covered, ?_⟩
+  · intro j _
+    have cost : projectedCost gates j ≤ gates.length := List.length_filter_le _ _
+    unfold canonicalSlot
+    omega
+  · have base : pL ((List.range rootBounds.length).map fun j => 16 + canonicalSlot k gates j) =
+        pk (PZ rootBounds).length (fun j => 16 + canonicalSlot k gates j) := by
+      rw [pL_pk]
+      simp only [List.length_map, List.length_range, PZ]
+      refine pk_congr (fun j hj => ?_)
+      have rangeBound : j < (List.range rootBounds.length).length := by simpa using hj
+      simp [List.getD_eq_getElem?_getD, List.getElem?_map, List.getElem?_eq_getElem rangeBound]
+    rw [canonicalBudget, base, sumc_eq (fun w hw => (good w hw).1), pk_sub]
+    intro j _
+    exact (cnt_length_le v j).trans (by omega)
+
+def wordModulus : ℕ := 371
+def recipeTable : ℕ := 0xfcfbebdead7e3ce8d362cf6ef9b3d6af1a3f4eb932d4ab122b46bcb9e2c74a9c286c99a247c38e0c3428c082c18a042408
+def rotationTable : List ℕ := [0xffef7cefae78df6d74cf2c70beeb6caeaa689e69648e28607de75c6da6585d65544d24503ce34c2ca2481c61440c2040, 0xffe5544d2e78df63ceaeaa682ca964cf2c7034cb6c8e28607de2486da5d6658f7cefa450d749e6bee75c1c6004083045, 0xffef7cefa8607de75ccf2c70bee658aeaa689e65d68e2e78df6d746dab6c9645544d245024834c2ca3ce1c61410c2100, 0xffe5544d28607de248aeaa682ca5d6cf2c7034c6588e2e78df63ce6da964b6cf7cefa45075c9e6beed741c6001083105]
+def wordLookup : List ℕ := [0x620000000000007000000000000000000052c0000000000000001c80, 0x1800000000000000000000000000001800134000000000000, 0x20f0000000000000000000000001a00, 0x6c0003c0000000000002200000000000000460001800000000000a00, 0x1000000000000002d5820000000480000000000000000000, 0x640000000000540000e000002f00000000000180000002d, 0x2700b000000cc0000001d000000b80000002000200000000000, 0x38000000000000000000000000000000000767800000000112a84900, 0x3d00000000000000000001b000000014000000000f930001300, 0x38d0000000000000000dc02e520000000d400000000004a00009, 0x20000000000000000000000000007c000003ac0000, 0x64000000001f8000a00000000000]
+def orbitSecondRecords : List ℕ := [0xf1ffdadbff1f33fc8dbfb1a37fc3cdffaf33fc8ccff2b37fcc59ff670bfc699ff378ffd651fd3433fdd04ff750bfc6c9ff2a8ffc88cff742ffc6c8ff696fdedefbf372efc6d3ff1b17fd9dbff730ffd6d5ff1b0fecde3bf, 0xd0ffc341ff0d17f8343fe0d07f9a59ffb123fcdccff1917fc644ffb10ffc642ffb107fec53ef5957f5ac2ffb137fc689ff376efc74fffe527fc74ffbb15ffc84fffe523fcdccbf1a4ffc681ff9d17fc3c4ff9d0ffdd03ff, 0x1313fc143ffa50ffc4c3ffa50bfc4c2ff0307fc141ffa507fc1c1ff040ff81c1fe7527fc441fd75277c0c2fa1b33fe74bff0513d8acbff6a67fc84dff1537fc8cfff173ff48cffb6567fcae3ffa537fc4cdffb127fc345ff, 0x6907fe887ffb18ffd94fff7513fda53ff1327fd7c9ff090ffc545ffed27fdb41ff376afd9c9df373efc8e27b2f5efda4fff1323fc845ff210ffd781ffad0ffd981ff2107fc88dff1507f4248de3535fcccdffa517fc4c5ff, 0xb17f82c3fe9d33fdd43ff234ffc8d1ffaf17fc8c5ff2313fc5c3ff230ffc8c1ff2b33fc8c3fb7517fcccbbf3766fedddff0d2ffc34c7e6a27fda81ffaf37fc8cdff1e17fca4dffb12ffcd0dff6a4ffda8fff6927fc885ff, 0x3716fca8dffb7c7fcdc4bf370efcdc2bf3706fca4bbf7327fc8e2fb270ffcd4dff1d5ffe75bffaf27fdac9ff7307fddeb3f1b6bcc7c5ff1f0ffc7c3fb3736fc8e1ff733ffdcd3ffaf23fdac8ff0b0ffe2c7ffaf07fdac1ff, 0x2133fdd01ff6b0ffdcc5ff3727fc44cff1333fc8dfff374ffdd5bff3723fcdc5ff6b17dc8cbff370fffdedff2b35fddeabf6b5ffc34cfe6a0ffc6d9ff3165fca63ff378dfcdcdff3786fcdc9bfb133fda43ff374efcdc8bf, 0x6c4f7]
+def orbitSecondBuckets : List ℕ := [0x28000808000, 0x800001000081007, 0x80000000808800000d, 0x808000000000000011, 0x10080008013, 0x800000108000000017, 0x80080000000080001b, 0x280000000000000081e, 0x100000080001000024, 0x808100000000000029, 0x1082d, 0x1000000000000000830, 0x80000028033, 0x3180000000000001039, 0x980000080808008844, 0x611080801080000004d, 0x401088000800000062, 0x103900008000001006f, 0xb00800000000007d, 0x808000800000000085, 0x80010100000000088, 0x88000808800000008d, 0x1000000408008000092, 0x18000800c900000009e, 0x8000080898000080ae, 0x882001000080b6, 0x80000180000000bf, 0x810000080c3, 0x800808088000080c7, 0x1080080080cd, 0x10000000a00080008d2, 0x9000000888000000db]
+def orbitThirdRecords : List ℕ := [0x744cbff1b4c8ff734c3ff6b243ff676c1ff6b0c1ff1b248de676c1f7216c1fb77ad3bf77ac8bf378c5bf77ac53fb7bc1bf75d04df5e6c1fb214ccff378df3b1b4c5ff1b4c3ff6b4c3ffaf9c1ff374c9ff1b441fd77b41ff2b88d7f2a8cdff1b4c3fbb5bcdff75acdff3534bff378c3bf, 0x378c3fb378e2bb2334cfe758cc7f742c1fff4c45ff6ba83f7b7bc9bf77cc9bfb7b4bbfeb942f7377c5bf377c3bf75542dfb168dff1b4c9ff5f6c1ff1b547ff730c1ff1b243fe377c3bb1b243fb1b243fab174def374cbbf77ac9bfb7bc8bf77ac1bf74a41ff75885ff758c47f77d43bf, 0xa174dff6b6d3f76b7dbf7236c3fb2384cff71a59ffb1443ffb1442ff236c4f3377c3fb376d9bff5b5adf77ac9ff77ac1ff2b4cdff2b7cd7f2b343ff77d43ff758dfdf2b343fe77ad3ff2b345f72164ffd2b345f675d05df77ac577674c2ff1a641fd6b845f7afacd7f75ae37f296cdf7, 0x5e441fdad743ef758e27be5248de6b6c9f7333cdff2b88dff1f6c3fb6b143f7376cdbf74acbff9d143ff9d0c1ff9d141ff6b6c1ff6b6c8f76b6c1f73534cfe9d6ccff756c3ff2b1c1ff742c5fe9d144f62b1c1fe758c9ff758c1ff758c9df77d2b3f6b6d3ff37c593ff4745ff756c3fb, 0x6b9c2f765448f7696c3f325443ff2b8d9ff1a4c9ffb1345ffb1343ff6d681ff75741ff757d9dfb1343fef7b5bbfb14cdef1d3c5ff9d245ff9d241ff9d243fe1d3c5fb1d3c4fb1d3c3fb25443f725442f75f441fd6d441fd2f641fd758c4ff77ac5bf750c2fa6b6c9ff744c3ff77ac5b7, 0xb1845ffb1843ff69741ff316d97f3798dbfb5c4d7f378dffb751c1fe75d235fafacdff2b8cdfff5c49ffb1945efb1943efb1942ef67655fd19141fdb1941ef6d655fdf5c49df191c1fca974dff65449ff65441fd65449f765441f5758ccff378cc7fb1acbff6b4c2ff37c597fb1b4def, 0x69641fd751c1ff75541fd15341fca3745ff74ac3ffa3741ffab94bf7a3745fba3744fba3743fba3741fbf5c44ff2b8c1ffb194fefa5343ffa5341ff1d641fdb1841ff37699bfa5345fea5343fea5341fe0d0c1fe0d141fe0d1c1feb1853efb144bff19241fd3764fbd758c5ff77d04bf, 0xa53cdffe57c5ff13143ff9f741ff13103fe75a53fff5749ffa51c3efa51c1ef3768dbff5749dfa51c1ee75549df9f743fb130c2fa77d51bf1b4ccff9d2c1ff5f793dbaf741ef6b441fd6b448f7378ccbf2354ff9b184ffff5943fff1a49ff21343ff21345fe21343feaf44dff6b6c5f7, 0x77d05bff3949ff15144f61d3cbfb2544bf7238857bb134c7e210c1ff67781df6b74fff75a49ffad84dff2ba8df775a49df13248deb18cdff353417f67981d7353417e37ae33f754cbffeb949ff33343ff746c1ff33345fe33343fe2374ffb258d1f7ef949ef73441fd655d1f56b449f7, 0x69541fd6b64ffd75a4d7f6b655fdf3c41ff752c9ff752c1ff752c9dff5c45ff6ba9377b3c4bbf2f5c8bff5744fff5b44ffb1a41ff1e341fe13245ff13243ff1d441fd677c1ff6d7c1ff6d9c1ffa5841ff211c1ff13243fe09143fe211c1fe37681bf65445f711241fd1934bff77651fd, 0x6a4c9ff6a7c1ffa58cdff23341ff1b64ffd23341feaf94def2b34cfef5bc1ffb17596f77ad93f1b699f35f4c4ff75ccbbf294cdff657c1ff65781ff67941ff29343fe224c5ff6d241ff6ba59ffb774dffb194befb12c7ef378ccff2f5c9bf6ba89776ba8177e9749ff21241ff67241df, 0xeb945f723143fb234c3fb23103fa77d6b3f236ccffb19c1ff1b68df3f5745ff23144f61f341ff332c1bff5b45df2134c7e236ccfb233cbfb291c1fe75849df37644bfb7c43bfb7c42bf2384dffb1a4bbf77d05ff0d2c1feb19c3ff316d9ff1134c7eb5c4dff75841ff316997faf8ddeb, 0x132c3ff738c3fb77d679faf0c1ff23841ff6b781ff6b9c1ff132c5fe1f144f6132c3fe75d0b5f17248de6b248de23543fb75acbff759c3ff757c3df759c3df75243fe75243deb7c48bfb7c45bf234c5ff234c4ff23143ff234c3ff37653bd9d6cdff757c3fb752c5fe27345f623441fd, 0xf1a83ff750c1ff75243df35341ff35341fe37ae3bf6b859ff77d53bf37345bf6b4c9ff23245ff77d5f9faf243ff739c1ff6b7c1ff6dac1ffaf243fe23243fe739c1df77ad97f23243fb23243faf7b6b3f1f4c3ff1b681f3754c3ff1f143fb1f4c3fb67785d7b7c49bf37343bf6b4c8ff, 0x298cdffef449ff73941ff6b941ff371c1be27845f773241ff23755fb378cd7f271c1ff271c1fe7584cffb7c43ff2b64d7f67141f71f243fa779d5bf77d49bf77d41bf734c9ff77d499faf241ff73b41ff6b241ff0b243fe737c1df23885fb77acf3f37acc3f75103fe270c1ff1f4c5ff, 0x37345fe298c1ff77a53bff19dbf7b7c63bfb16c4f7378c17fb184cff75845fff1ac3ffb7c49ff37343ff37343fe37241bf316536d77d6abf37541bd37d4d3f6ba89f7694c3ff69243fe75a83ffb7c48ffb7c45ff75a4dffb7c53ef37445bfb7943bff5942ffb71c5bf37447bf371c1bf, 0x232c3faf4c4bffb16c8ff75ac3ff370c1ffab94d7f2b3417f77d49ff316487ff5b635f77d41ff77d4cbf77d49df77a49bf77a41bf3764bbfab94d77af8c3fb31699ff27881ffb16c5ffb16c3fff3c43ffb16c1ffb16d3ef7794fbf374cdff316457f316447f77d44bf719d97f316427f, 0x748c3fbad8cbff6b957f7656d9ff6b4c5ff6b7c5ff1b4cdff77d741fb16c9ff1b343fff5bc3ffb7941ff371c1ff757dbdf1b343fe371c1fe316497f6b4c5f76b7c5f7237c4fbaf7c3fb237c3fb1b343fb759dbd7378cdbf6b8dbfb234cbffaf8c1ff75d035f2134cfe2b8dbf3232c3fb, 0x1b0c1ffa56c1ff1b1c1ff6d6d5df756c9ff756c9df77ad9ffe775bf71b0c1fb237c9fb6b141f72388c7b378c1bf758cb7f73ac9ffeb743ff278c1ff734c5ffaf7c1ff756c1ff37241ff2b84d7f75d0bdf74a4bbf37541fd1f2c3fb37d4d7f1f2c3fab7bcdbf3734bbfefac9ff75143ff, 0xb1743efb1741ef379c3bf31653ed6b6d9ff37d4dbf318d97f696c9f7696c1f7744c4ff6b6d9f777d745f754c2ff26343fe1b241ff756c4f7696d3f7356cd7f77d6bff2a8c3fb77ac33ff1957efb1acdff376dab377d4cff1b541fd77acfbf372c1bf37accbff19c2ffb1981ff77d45bf, 0x75d03df9d341fef1949ef2b8cffb73ac5f7b174febab94dff2b341ff75d1b5f31648ff2b341fe236cdfff58ddfbf1948ef6b5c5f7236cdfb31645ff77d45ff31644ff31643ff31642ff261c1feb1681ff756ccffb1693ef37a8dbf2a8c9fff4c43ff378c1ff3164b7fb1745ef193c4fd, 0x1d3cdff37acd3f758cbfff5949fff5949df1d3cdfb2544df72b84dfff1a4fff37d4dff6b642ff75681ffedadbff744c5ff6b6cff7236c1fb75441fd2b6ccf73734cbe756c5ff758c37f31649ff1a4cdffb1689ff2b8cfff65651fd9d345ff9d343ff758c37b9d341ff9d345fe0f343fe, 0xb184dff268c1ff376d3bf376c8bf2174ffbb15c8ff2364ffd3734cfe3784cbfb18ddeb356cdff6b885f777ac3bfb194defb1347ef19341fca1741ff376c3bbb15c5ffb15c3ffb574d7f75ac2ff1a541fd676c3fb3568d7f74144f6276c3f32b8e27b77adb372544dff1a1c1fe1a349fe, 0x9d34c7e194c8fd19544fd67641fdb1b42ef21641fdb1248dea374dfff5c4bff173cdfd233cdfb6b85bf319143ff67741ff66741ffb10c1ffb1141ffb1103fe37acd7f3164bffb14c5efb14c4efb14c3efb14c2ef77d0bbf376c9bfb10c2fa6974ffbb16ccffb15c9ffb1144f6b174bef, 0xb13c5ffb13c4ffb13c3ff2b8d3ff2b8c5ff2b8c3ff2b6cd7f13345ffb1245fff5945ff13343ffb1243ff758c3fbb1241ff13345fe13343fe0d143feb1243fe194c9fd11341fd5f641fdb1b41ef2b8c3fb11341fc2b8c5f7f4bc5ff758db7b9d34bff1b34cfe74ac5f76ba99776964ffd, 0x70c1fe07141fe378cf3b754c9ff757c1ff75b41ff754c9df757c9df6b6c3f70d243fead345fe75b41dfa50c2fa6b6c3fb6b6c3f3a385dfb75bd7bf2388d7bf1448ff2b4cbff2b8c8ffafac1ffa584dffb1885ff21341ffb1b4fef759c1ff21341fe759c1df758c3ff738dfdb3384dbf, 0x759cd5fb7743bf6b0c2faa58e27b238817be7943ff3568dff75941ff738c1fff1a89ff22345ff150c1fd21441fd75241ff22345feaf441fd75241df2b8e2fb753497e353495ef574bff33341ff77adbb7f5b4bdfb78dd3ff17c4ffb1781ffb1a4dff37acdbff1449ffa50c1ff2b8c9ff, 0xb18c5ffb18c4ffb18c3ff15241fd6b741ff75a89df6b653fd353497f373c8bfb7745bf77d03bfb7741bfb18c3fba53c5ff754c4ffa53c3ff757c4df214c5ffa5243ff214c3ffa5241ffe7749df891c3fe091c1fe5f541fd6d541fd151c1fc354cd7ff594dff353457f353437f757cd5f, 0x298cffbb17c5ffb17c3ffb17c1ff37acdff1e1c1ff1e1c1fe378cf7b653c9ff1f643fb29341fe694c9ff34345fe34343fe6da41fff7d71bf37689bff1ac8ffb12c3ff73741ffb12c1ffb12c5fe739d9df194cbfd6b641fd373c9bff5c43ff653c8ff1d541fd697c1ff22141ff37693bf, 0x759c5df75d015f1f343fb1f343fab13cbff37641bdab74d7f2b6cdf71334bffb12c9ffaf341ff75ac1ff0d2c3feaf541fdaf341fe1334c7eea749ff234cdfff1ac9ff23345ffaf343ff23343ff3774fbfaf345fe23345feaf343fe23343fe75a8d7f73641fd23343fb3774fbb23343fa, 0x6b541fd75cc9df6b443f723843fb2388dfb69643fff5743ff27341fff5b43dfaf3cdffa58c5ffa58c3ff230c1ff23141ffa58c1ff231c1ff231c1feb7741ff755c9ff75ac9ff75cc1fff5bc9df75ac9dfa58c3fb2d54bdf230c1fb65645ff2b6cdff754c5ff757c5ff334cbbf757c5df, 0x9d6c3fbb5bcd7f75acd7f3534b7f378cfbf378c33f1b693f3a57c3ff746c3fb1f141ff6d545ffa174cff1f1c1fef7ae5b7378c33b75141ff332c9bf75245df2234c7e75144f61f443fb1f0c1fb3764dffb7c61bfeb943ff37341bfeb748ff37341bef7949ff0b0c1fe0b1c1feaf941ef, 0x35345ff35343ff757cddf35343fe37641fd3784dbff494bff294cbbf370c2ba77ad33f376ccbf77ac83f77adf3f75d045f27243df75a43ff27243de270c2fa6b94fff75349feb794dbf35349de677c3fb9d6c1ff6ba53ffeb749ff23241ff752c3fe6b94ff7731c1ffad2c7ef3774ffb, 0x37243beaf8cdff6ba837777d4bbf27841fff1ac5ff1b64dff35349ff3164d7f374c5bf374c4bf37143bf374c3bf374c2bff1ac5f775accff3434bffe56c9ff752c3ff37441bd372489e73841bf1d6cffbb18cbff378c93fb7b633f777de9b274c3ff1b689f375d0c5f759e2df354cdff, 0x6a4c3ff27889dff5bc5ff75ac5ffb794dffb16c7ef6b853ff75a8dff374c9bf37245bf316417d37547bf75ac5f76a7c3fb6b9e1f72334bfff7ae5f7378c37b378e23bb17cbff75889df37341ffaf34c7e2334c7eb7347fe374c8bf37243bf777c1bf37544bf779c1bf37542bfb7847bf, 0xf5c42ffeb745ff237c1ffa56cdff748c5ff374c5ff779d3ff1b341ff1b341fe318597f7754ffd6b849ff37248deeb745f7edac5f76b841ff232c1ff77ac97f77ac17f2b4cd7fab74dff75cc5ff2b3437f37a4dbf758df5f759e35f696d9f777ad37f2b8ccff2b34577758df5b75d055f, 0x1b4c4f7f4943ff737c3db378c3bb1b103f23534c7e6b7c3ff6b9c3ff1f2c1ff374c8ff6b243fe37243ff777c1ff779c1ff758c97f37243fe758c17f758c95f6b9c3f7216cdfb77a89bff4c44ff278c5f76b6d1f7]
+def orbitThirdBuckets : List ℕ := [0x108800020190988000, 0x2800880013000902812, 0x180800010a88808829, 0x10000808010008839, 0x980800008000881041, 0x100000002100000084b, 0x1881800008188900054, 0x2800100819908008863, 0x901908000809000876, 0x1010b80808000000884, 0x8808088000008a9893, 0x41100808080080108a2, 0x10018000008000010b5, 0x2b980000900000018bd, 0x9128801880200088d2, 0x20a20880909008108e7, 0x89991082120100100, 0x18c2100888089008919, 0x1801088200010809934, 0x8a0900890000008146, 0x881110111880808154, 0x2109820018800008166, 0x1108801219818809179, 0x1080108141890800192, 0x18908089139808901a9, 0x880111012900089c4, 0x8081010ba8880881d7, 0x80081088900801ee, 0x8081020411008109f8, 0x89080212110080210, 0x20080009398a8889a24, 0x100000111110901242, 0x800001020889910253, 0x1080088001264, 0x88000001088081926b, 0x2800000008080101a77, 0x888800028889090283, 0x2a09080011800000a94, 0x801800020081000aa7, 0x1088900000088180ab3, 0x880100800080880ac0, 0x10889008000000012c9, 0x10000100888080092d3, 0x31008018880000012de, 0x3880001008080a8aee, 0x4221000110808800301, 0x1a90000008808019b1a, 0x21a3008080008810b2d, 0x90a980889100018345, 0x18a190a20000001035b, 0x818a8920800000373, 0x1098a12110800008385, 0x800082a900909839c, 0x19880888b18000003b1, 0x18800003919180083c5, 0x29192081919108083db, 0x908081218991903fa, 0x1108809981080802413, 0x880088b0a90880428, 0x1000111b880008c3d, 0x900080911208880c50, 0x1000000021808001463, 0x800928928000c6f, 0x108800890a990108c81]
+
+abbrev WireRecipe := Fin 8 ⊕ (Bool × Fin 8 × Fin 8)
+
+def rawRecipeWord (i : Fin 8) : W := rootPreparedWords.getD (([5, 4, 7, 6, 3, 2, 1, 0] : List ℕ).getD i.val 0) ⟨0,0,0,0,3⟩
+
+def recipeValue (r : WireRecipe) : W :=
+  match r with
+  | .inl i => rawRecipeWord i
+  | .inr (d,a,b) => opW d (rawRecipeWord a) (rawRecipeWord b)
+
+def wireRecipe (i : Fin 64) : WireRecipe :=
+  if h : i.val < 8 then .inl ⟨i.val,h⟩ else
+    let code := (recipeTable >>> (7 * (i.val-8))) % 128
+    .inr (code.testBit 6, Fin.ofNat 8 code, Fin.ofNat 8 (code >>> 3))
+
+def rotateRecipe (a : Fin 4) : WireRecipe → WireRecipe
+  | .inl i => .inl (permuted a i)
+  | .inr (d,i,j) =>
+    let l := permuted a i
+    let r := permuted a j
+    if l.val ≤ r.val then .inr (d,l,r) else .inr (d,r,l)
+
+def rotateLabel (a : Fin 4) (i : Fin 64) : Fin 64 :=
+  Fin.ofNat 64 ((rotationTable.getD a.val 0) >>> (6*i.val))
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+lemma rawRecipe_signal : ∀ i : Fin 8, (rawRecipeWord i).s = sampleWire i.val := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+lemma recipeRotation_checked : ∀ a : Fin 4, ∀ i : Fin 64,
+    wireRecipe (rotateLabel a i) = rotateRecipe a (wireRecipe i) := by decide +kernel
+
+lemma recipe_rotation (a : Fin 4) (r : WireRecipe) :
+    rotateSample a (recipeValue r).s = (recipeValue (rotateRecipe a r)).s := by
+  rcases r with i | ⟨d,i,j⟩
+  · simpa only [recipeValue, rotateRecipe, rawRecipe_signal] using rotation_wire a i
+  · simp only [recipeValue, opW_s, rawRecipe_signal, rotation_op, rotation_wire, rotateRecipe]
+    by_cases order : (permuted a i).val ≤ (permuted a j).val
+    · simp only [if_pos order, recipeValue, opW_s, rawRecipe_signal]
+    · simp only [if_neg order, recipeValue, opW_s, rawRecipe_signal]
+      exact op_comm _ _ _
+
+def labelSignal (i : Fin 64) : ℕ := (recipeValue (wireRecipe i)).s
+
+lemma label_rotates (a : Fin 4) (i : Fin 64) : rotateSample a (labelSignal i) = labelSignal (rotateLabel a i) := by
+  unfold labelSignal
+  rw [recipeRotation_checked,recipe_rotation]
+
+lemma label_generated (i : Fin 64) : SampleSignal (labelSignal i) := by
+  unfold labelSignal
+  cases e : wireRecipe i with
+  | inl j => rw [recipeValue,rawRecipe_signal]; exact .raw j
+  | inr data =>
+    obtain ⟨d,j,k⟩ := data
+    simp only [recipeValue,opW_s,rawRecipe_signal]
+    exact .gate d (.raw j) (.raw k)
+
+def readLabel (w : W) : Option (Fin 64) :=
+  let pos := w.s % wordModulus
+  let id := ((wordLookup.getD (pos / 32) 0) >>> (7 * (pos % 32))) % 128
+  if 1 ≤ id && id ≤ 64 then
+    let label := Fin.ofNat 64 (id-1)
+    if labelSignal label == w.s then some label else none
+  else none
+
+lemma readLabel_exact {w : W} {label : Fin 64} (found : readLabel w = some label) : labelSignal label = w.s := by
+  unfold readLabel at found
+  dsimp only at found
+  split at found
+  · split at found
+    · rename_i heq
+      obtain rfl := Option.some.inj found
+      exact beq_iff_eq.mp heq
+    · simp at found
+  · simp at found
+
+def readStock : List W → Option (List (Fin 64))
+  | [] => some []
+  | head :: rest => do
+    let i ← readLabel head
+    let labels ← readStock rest
+    return i :: labels
+
+lemma readStock_exact {ws : List W} {labels : List (Fin 64)} (found : readStock ws = some labels) :
+    labels.map labelSignal = ws.map W.s := by
+  induction ws generalizing labels with
+  | nil => cases found; rfl
+  | cons w ws ih =>
+    cases head : readLabel w with
+    | none => simp [readStock,head] at found
+    | some i =>
+      cases rest : readStock ws with
+      | none => simp [readStock,head,rest] at found
+      | some is =>
+        simp [readStock,head,rest] at found
+        subst labels
+        simp only [List.map_cons, readLabel_exact head, ih rest]
+
+def labelStock (labels : List (Fin 64)) : Finset ℕ := (labels.map labelSignal).toFinset
+
+def shapeBits (a : Fin 4) (labels : List (Fin 64)) : ℕ :=
+  labels.foldr (fun i bits => (1 <<< (rotateLabel a i).val) ||| bits) 0
+
+lemma bitOfShape (a : Fin 4) (labels : List (Fin 64)) (j : Fin 64) :
+    (shapeBits a labels).testBit j.val = true ↔ ∃ i ∈ labels, rotateLabel a i = j := by
+  induction labels with
+  | nil => simp [shapeBits]
+  | cons i rest ih =>
+    simp only [shapeBits, List.foldr_cons, Nat.testBit_or] at ih ⊢
+    simp only [Bool.or_eq_true, ih, List.mem_cons]
+    rw [show (1 <<< (rotateLabel a i).val : ℕ) = 2 ^ (rotateLabel a i).val by
+      rw [Nat.shiftLeft_eq]; simp]
+    simp only [Nat.testBit_two_pow, beq_iff_eq, decide_eq_true_eq]
+    constructor
+    · rintro (current | ⟨l,hl,eq⟩)
+      · exact ⟨i, Or.inl rfl, Fin.ext current⟩
+      · exact ⟨l, Or.inr hl, eq⟩
+    · rintro ⟨l, mem, eq⟩
+      rcases mem with rfl | rest
+      · exact Or.inl (congrArg Fin.val eq)
+      · exact Or.inr ⟨l,rest,eq⟩
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+lemma equalRotatedShape {a b : Fin 4} {as bs : List (Fin 64)} (same : shapeBits a as = shapeBits b bs) :
+    rotationStock a (labelStock as) = rotationStock b (labelStock bs) := by
+  have sub {p q : Fin 4} {ps qs : List (Fin 64)} (eq : shapeBits p ps = shapeBits q qs) :
+      rotationStock p (labelStock ps) ⊆ rotationStock q (labelStock qs) := by
+    intro x hx
+    obtain ⟨old,ho,rfl⟩ := Finset.mem_image.mp hx
+    obtain ⟨i,hi,rfl⟩ := List.mem_map.mp (List.mem_toFinset.mp ho)
+    have h := (bitOfShape p ps (rotateLabel p i)).2 ⟨i,hi,rfl⟩
+    rw [eq] at h
+    obtain ⟨j,hj,e⟩ := (bitOfShape q qs (rotateLabel p i)).mp h
+    apply Finset.mem_image.mpr
+    refine ⟨labelSignal j, List.mem_toFinset.mpr (List.mem_map_of_mem hj), ?_⟩
+    rw [label_rotates, label_rotates, e]
+  exact Finset.Subset.antisymm (sub same) (sub same.symm)
+
+def chooseRotation (labels : List (Fin 64)) : Fin 4 :=
+  [1,2,3].foldl (fun best turn => if shapeBits turn labels < shapeBits best labels then turn else best) 0
+
+structure OrbitRecord where
+  retained : List (Fin 8)
+  gates : List (Fin 56)
+  turn : Fin 4
+
+def decodeOrbitRecord (width code : ℕ) : OrbitRecord := ⟨
+  (List.finRange 8).filter (fun i => code.testBit i.val),
+  (List.range width).map (fun k => Fin.ofNat 56 ((code >>> (8 + 6*k)) % 64)),
+  Fin.ofNat 4 (code >>> (8+6*width))⟩
+
+def orbitRecordAt (width index : ℕ) : OrbitRecord :=
+  let words := if width = 2 then orbitSecondRecords else orbitThirdRecords
+  let bits := 10 + 6*width
+  let packed := (words.getD (index / 32) 0) >>> (bits * (index % 32))
+  decodeOrbitRecord width packed
+
+def recipeOfPair (id : Fin 56) : Bool × Fin 8 × Fin 8 :=
+  let c := (recipeTable >>> (7*id.val)) % 128
+  (c.testBit 6, Fin.ofNat 8 c, Fin.ofNat 8 (c >>> 3))
+
+def inputGate (id : Fin 56) : InputGate :=
+  let recipe := recipeOfPair id
+  ⟨recipe.1, rawRecipeWord recipe.2.1, rawRecipeWord recipe.2.2⟩
+
+def rawLabel (i : Fin 8) : Fin 64 := ⟨i.val, by omega⟩
+def pairLabel (i : Fin 56) : Fin 64 := ⟨8+i.val, by omega⟩
+
+def OrbitRecord.labels (record : OrbitRecord) : List (Fin 64) :=
+  record.retained.map rawLabel ++ record.gates.map pairLabel
+
+def OrbitRecord.key (record : OrbitRecord) : ℕ := shapeBits record.turn record.labels
+
+def orbitCount (width : ℕ) : ℕ := if width = 2 then 225 else 1176
+
+def orbitFind (width key : ℕ) : Option ℕ :=
+  let rows := if width = 2 then orbitSecondBuckets else orbitThirdBuckets
+  let bucket := (key % 65521) % (if width = 2 then 512 else 1024)
+  let block := rows.getD (bucket / 16) 0
+  let counts := block >>> 11
+  let size := fun i => (counts >>> (4*i)) % 16
+  let start := (List.range (bucket % 16)).foldl (fun pos i => pos + size i) (block % 2048)
+  (List.range' start (size (bucket % 16))).find? (fun i =>
+    i < orbitCount width && (orbitRecordAt width i).key == key)
+
+def lookupOrbit (width : ℕ) (ws : List W) : Option ℕ := do
+  let labels ← readStock ws
+  orbitFind width (shapeBits (chooseRotation labels) labels)
+
+lemma orbitFind_exact {width key i : ℕ} (found : orbitFind width key = some i) :
+    i < orbitCount width ∧ (orbitRecordAt width i).key = key := by
+  unfold orbitFind at found
+  dsimp only at found
+  have got := List.find?_some found
+  simpa only [Bool.and_eq_true, decide_eq_true_eq, beq_iff_eq] using got
+
+lemma rawRecipe_inBank (i : Fin 8) : rawRecipeWord i ∈ rootPreparedWords := by
+  have valid : ([5,4,7,6,3,2,1,0] : List ℕ).getD i.val 0 < rootPreparedWords.length := by
+    fin_cases i <;> decide
+  unfold rawRecipeWord
+  rw [List.getD_eq_getElem?_getD, List.getElem?_eq_getElem valid]
+  exact List.getElem_mem valid
+
+lemma gate_inBank (code : Fin 56) :
+    (inputGate code).left ∈ rootPreparedWords ∧ (inputGate code).right ∈ rootPreparedWords :=
+  ⟨rawRecipe_inBank _, rawRecipe_inBank _⟩
+
+lemma recipeValue_raw (i : Fin 8) : recipeValue (wireRecipe (rawLabel i)) = rawRecipeWord i := by
+  simp [recipeValue,wireRecipe,rawLabel,i.isLt]
+
+lemma recipeValue_pair (i : Fin 56) : recipeValue (wireRecipe (pairLabel i)) = (inputGate i).output := by
+  have notRaw : ¬ (8 + i.val < 8) := by omega
+  simp [recipeValue,wireRecipe,pairLabel,notRaw,inputGate,recipeOfPair,InputGate.output]
+
+noncomputable def sortRaw (inputs : List (Fin 8)) : List W := (inputs.map rawRecipeWord).foldr addS []
+
+noncomputable def OrbitRecord.stock (record : OrbitRecord) : List W :=
+  canonicalStock (sortRaw record.retained) (record.gates.map inputGate)
+
+noncomputable def OrbitRecord.state (k : ℕ) (record : OrbitRecord) : SearchState :=
+  let ws := record.stock
+  (canonicalBudget k (record.gates.map inputGate) ws, ws)
+
+lemma stockFold (words start : List W) (ordered : Srt start) :
+    Srt (words.foldr addS start) ∧
+    ((words.foldr addS start).map W.s).toFinset = (words.map W.s).toFinset ∪ (start.map W.s).toFinset := by
+  induction words with
+  | nil => exact ⟨ordered, by simp⟩
+  | cons w words ih =>
+    obtain ⟨sorted, remains, new, old⟩ := addS_spec (o := w) ih.1
+    refine ⟨sorted, ?_⟩
+    ext x
+    simp only [List.foldr_cons, List.map_cons, List.toFinset_cons, Finset.mem_union, Finset.mem_insert]
+    constructor
+    · intro hx
+      obtain ⟨v,hv,rfl⟩ := List.mem_map.mp (List.mem_toFinset.mp hx)
+      rcases remains v hv with rfl | h
+      · exact Or.inl (Or.inl rfl)
+      · have := List.mem_toFinset.mpr (List.mem_map_of_mem (f := W.s) h)
+        rw [ih.2,Finset.mem_union] at this
+        exact this.elim (fun found => Or.inl (Or.inr found)) Or.inr
+    · intro hx
+      rcases hx with (rfl | hw) | init
+      · obtain ⟨v,hv,he⟩ := new
+        exact List.mem_toFinset.mpr (List.mem_map.mpr ⟨v,hv,he⟩)
+      · have stock : x ∈ ((words.foldr addS start).map W.s).toFinset := by rw [ih.2]; exact Finset.mem_union_left _ hw
+        obtain ⟨v,hv,rfl⟩ := List.mem_map.mp (List.mem_toFinset.mp stock)
+        exact List.mem_toFinset.mpr (List.mem_map_of_mem (old v hv))
+      · have stock : x ∈ ((words.foldr addS start).map W.s).toFinset := by rw [ih.2]; exact Finset.mem_union_right _ init
+        obtain ⟨v,hv,rfl⟩ := List.mem_map.mp (List.mem_toFinset.mp stock)
+        exact List.mem_toFinset.mpr (List.mem_map_of_mem (old v hv))
+
+lemma OrbitRecord.sorted_stock (o : OrbitRecord) : Srt o.stock := by
+  exact (canonicalStock_support (stockFold _ [] (by simp [Srt])).1 _).1
+
+lemma OrbitRecord.stock_rep (o : OrbitRecord) : Rep o.stock (labelStock o.labels) := by
+  have sorted := o.sorted_stock
+  have raw := (stockFold (o.retained.map rawRecipeWord) [] (by simp [Srt])).2
+  have gates := (stockFold ((o.gates.map inputGate).map InputGate.output) (sortRaw o.retained)
+    (stockFold _ [] (by simp [Srt])).1).2
+  refine ⟨?_, ?_⟩
+  · rw [List.Nodup, List.pairwise_map]
+    exact sorted.imp fun h => Ne.symm (Nat.ne_of_lt h)
+  · change (o.stock.map W.s).toFinset = _
+    unfold OrbitRecord.stock canonicalStock
+    rw [← List.foldr_map, gates]
+    change _ ∪ (((o.retained.map rawRecipeWord).foldr addS []).map W.s).toFinset = _
+    rw [raw]
+    simp only [List.map_nil,List.toFinset_nil,Finset.union_empty]
+    unfold labelStock OrbitRecord.labels
+    simp only [List.map_append,List.toFinset_append,List.map_map,Function.comp_def,
+      labelSignal,recipeValue_raw,recipeValue_pair]
+    exact Finset.union_comm _ _
+
+lemma orbitRawFacts (inputs : List (Fin 8)) {w : W} (member : w ∈ sortRaw inputs) : w ∈ rootPreparedWords := by
+  have ext (words : List W) (source : ∀ x ∈ words, x ∈ rootPreparedWords) :
+      Srt (words.foldr addS []) ∧ ∀ x ∈ words.foldr addS [], x ∈ rootPreparedWords := by
+    induction words with
+    | nil => simp [Srt]
+    | cons x rest ih =>
+      obtain ⟨sorted, members⟩ := ih (fun w h => source w (by simp [h]))
+      have add := addS_spec (o := x) sorted
+      exact ⟨add.1,fun w h => (add.2.1 w h).elim (fun eq => eq ▸ source x (by simp)) (members w)⟩
+  exact (ext _ (fun x hx => by obtain ⟨v,_,rfl⟩ := List.mem_map.mp hx; exact rawRecipe_inBank v)).2 w member
+
+lemma OrbitRecord.stock_support (o : OrbitRecord) :
+    ∀ w ∈ o.stock, w ∈ rootPreparedWords ∨ ∃ g ∈ o.gates.map inputGate, w = g.output := by
+  intro w hw
+  obtain ⟨_,covers⟩ := canonicalStock_support (stockFold _ [] (by simp [Srt])).1 (o.gates.map inputGate)
+  exact (covers w hw).elim (fun raw => Or.inl (orbitRawFacts _ raw)) Or.inr
+
+lemma OrbitRecord.budget_sound (o : OrbitRecord) {k : ℕ} (gates : k + o.gates.length ≤ 14) (len : o.stock.length ≤ 15) :
+    StOk (PZ rootBounds) (tz 0) I.AA k (o.state k).1 o.stock (labelStock o.labels) := by
+  apply rootCanonicalState o.stock_rep k (o.gates.map inputGate) (by simpa using gates) len _ o.stock_support
+  intro g hg
+  obtain ⟨i,_,rfl⟩ := List.mem_map.mp hg
+  exact gate_inBank i
+
+lemma codeStock_generated (labels : List (Fin 64)) : ∀ x ∈ labelStock labels, SampleSignal x := by
+  intro x hx
+  obtain ⟨i,_,rfl⟩ := List.mem_map.mp (List.mem_toFinset.mp hx)
+  exact label_generated i
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+lemma rotateStock_twice (a : Fin 4) {S : Finset ℕ} (gen : ∀ x ∈ S, SampleSignal x) :
+    rotationStock a (rotationStock a S) = S := by
+  ext x
+  constructor
+  · intro hx
+    obtain ⟨before, h, rfl⟩ := Finset.mem_image.mp hx
+    obtain ⟨orig, ho, rfl⟩ := Finset.mem_image.mp h
+    rwa [rotation_involutive_on a (gen orig ho)]
+  · intro h
+    exact Finset.mem_image.mpr ⟨rotateSample a x, Finset.mem_image_of_mem _ h, rotation_involutive_on a (gen x h)⟩
+
+abbrev NoShorter (S : Finset ℕ) (k : ℕ) :=
+  ∀ q < k, ¬ Sol Z0 (mz 0) (tz 0) q (C (mz 0) ({x | RZ [] 0 x ≠ 0} ∪ (S : Set ℕ)))
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+lemma orbitProblem {width idx : ℕ} {v : List W} {S : Finset ℕ} {k t : ℕ}
+    (found : lookupOrbit width v = some idx) (rep : Rep v S)
+    (live : Live Z0 (mz 0) (tz 0) k t S) (short : NoShorter S k)
+    (ready : RawMode true (RZ [] 0) (mz 0) (tz 0) k t S) :
+    let target := labelStock (orbitRecordAt width idx).labels
+    Live Z0 (mz 0) (tz 0) k t target ∧ NoShorter target k ∧
+    RawMode true (RZ [] 0) (mz 0) (tz 0) k t target := by
+  cases stock : readStock v with
+  | none => simp [lookupOrbit,stock] at found
+  | some labels =>
+    let a := chooseRotation labels
+    let o := orbitRecordAt width idx
+    have lookup : orbitFind width (shapeBits a labels) = some idx := by simpa [lookupOrbit,stock,a] using found
+    have repr : S = labelStock labels := by
+      dsimp only [labelStock]
+      rw [readStock_exact stock, rep.2]
+    have align : rotationStock a S = rotationStock o.turn (labelStock o.labels) := by
+      rw [repr]
+      exact equalRotatedShape (orbitFind_exact lookup).2.symm
+    have gen : ∀ x ∈ S, SampleSignal x := by rw [repr]; exact codeStock_generated labels
+    have live1 := live.rotateStock gen a
+    have short1 := rotateShortExclusion a gen short
+    have ready1 := rotateRawMode a gen ready
+    change Live Z0 (mz 0) (tz 0) k t (rotationStock a S) at live1
+    rw [align] at live1 short1 ready1
+    have gen2 : ∀ x ∈ rotationStock o.turn (labelStock o.labels), SampleSignal x := by
+      intro x hx
+      obtain ⟨w,hw,rfl⟩ := Finset.mem_image.mp hx
+      exact rotation_generated o.turn (codeStock_generated _ w hw)
+    have restore := rotateStock_twice o.turn (codeStock_generated o.labels)
+    have live2 := live1.rotateStock gen2 o.turn
+    have short2 := rotateShortExclusion o.turn gen2 short1
+    have ready2 := rotateRawMode o.turn gen2 ready1
+    change Live Z0 (mz 0) (tz 0) k t (rotationStock o.turn (rotationStock o.turn (labelStock o.labels))) at live2
+    rw [restore] at live2 short2 ready2
+    exact ⟨live2,short2,ready2⟩
+
+
+lemma orbitRecord_counts (width idx : ℕ) :
+    (orbitRecordAt width idx).retained.length ≤ 8 ∧ (orbitRecordAt width idx).gates.length = width := by
+  unfold orbitRecordAt decodeOrbitRecord
+  exact ⟨(List.length_filter_le _ _).trans (by simp), by simp⟩
+
+lemma OrbitRecord.card_stock_le (o : OrbitRecord) :
+    o.stock.length ≤ o.retained.length + o.gates.length := by
+  have h := List.toFinset_card_le (o.labels.map labelSignal)
+  change (labelStock o.labels).card ≤ _ at h
+  rw [o.stock_rep.card] at h
+  simpa [OrbitRecord.labels] using h
+
+def rootGatesDistinct : Bool := (List.finRange 56).all fun gate =>
+  !(rootPreparedWords.any fun wire => wire.s == (inputGate gate).output.s)
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+lemma rootGatesDistinct_checked : rootGatesDistinct = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+lemma newGateIsDerived (code : Fin 56) : (inputGate code).output.s ∉ WZ [] 0 := by
+  intro old
+  obtain ⟨i,same⟩ := sampleWire_covers old
+  have belongs := rawRecipe_inBank i
+  have wrong : (rootPreparedWords.any fun wire => wire.s == (inputGate code).output.s) = true := by
+    apply List.any_eq_true.mpr
+    exact ⟨rawRecipeWord i,belongs,by rw [rawRecipe_signal,← same,beq_self_eq_true]⟩
+  have known := List.all_eq_true.mp rootGatesDistinct_checked code (by simp)
+  simp [wrong] at known
+
+lemma OrbitRecord.exact_raw_tags (o : OrbitRecord) : ∀ w ∈ o.stock, w.r = RZ [] 0 w.s := by
+  intro w hw
+  rcases o.stock_support w hw with raw | ⟨g,member,rfl⟩
+  · obtain ⟨_,_,present,tag⟩ := rootWordFacts _ raw
+    rw [tag,RZ,if_pos present]
+  · obtain ⟨code,_,rfl⟩ := List.mem_map.mp member
+    rw [RZ,if_neg (newGateIsDerived code),InputGate.output,opW_r]
+
+-- Verify each representative with the ordinary recursive search. The earlier frontier
+-- can reuse the already certified representatives for its pure successors.
+def ignoreOrbit (_ _ _ : ℕ) (_ : List W) : Bool := false
+
+def rejectOrbit (target width k t _ : ℕ) (ws : List W) : Bool :=
+  (k == target) && (t == 1) && (lookupOrbit width ws).isSome
+
+abbrev rejectThird := rejectOrbit 11 3
+
+def rootReject (k t z : ℕ) (ws : List W) : Bool :=
+  rejectOrbit 12 2 k t z ws || rejectThird k t z ws
+
+noncomputable def orbitCheck (reject : ℕ → ℕ → ℕ → List W → Bool)
+    (width fuel k idx : ℕ) : Bool :=
+  let entry := (orbitRecordAt width idx).state k
+  !(frc entry.2 (fun ws => st entry.1 (fun budget =>
+    look1RawC reject I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 fuel k 1 budget ws)))
+
+lemma lookupOrbit_bound {width : ℕ} {ws : List W} {idx : ℕ} (found : lookupOrbit width ws = some idx) :
+    idx < orbitCount width := by
+  cases h : readStock ws with
+  | none => simp [lookupOrbit,h] at found
+  | some labels =>
+    have atIndex : orbitFind width (shapeBits (chooseRotation labels) labels) = some idx := by
+      simpa [lookupOrbit,h] using found
+    exact (orbitFind_exact atIndex).1
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+lemma rejectOrbit_sound {inner : ℕ → ℕ → ℕ → List W → Bool}
+    (valid : RejectSound true (RZ [] 0) (mz 0) (tz 0) inner)
+    {width fuel k₀ : ℕ} (cap : k₀ + width ≤ 14) (widthBound : width ≤ 7)
+    (checked : rangeCheck (orbitCheck inner width fuel k₀) 0 (orbitCount width) = true) :
+    RejectSound true (RZ [] 0) (mz 0) (tz 0) (rejectOrbit k₀ width) := by
+  intro k t z ws S k' rep size live short ready reject
+  simp only [rejectOrbit, Bool.and_eq_true, beq_iff_eq] at reject
+  obtain ⟨⟨same,one⟩,found⟩ := reject
+  subst k
+  subst t
+  cases record : lookupOrbit width ws with
+  | none => simp [record] at found
+  | some idx =>
+    obtain ⟨renamed,minimum,ready'⟩ := orbitProblem record rep live short ready
+    let entry := orbitRecordAt width idx
+    obtain ⟨inputs,gates⟩ := orbitRecord_counts width idx
+    change entry.retained.length ≤ 8 at inputs
+    change entry.gates.length = width at gates
+    have len : entry.stock.length ≤ 15 := entry.card_stock_le.trans (by omega)
+    have witness := entry.budget_sound (by omega : k₀ + entry.gates.length ≤ 14) len
+    have hd := boolOfNeg (rangeCheck_at checked (lookupOrbit_bound record))
+    simp only [orbitCheck, frc_eq, st_eq, ← rootPreparedMask_eq] at hd
+    exact look1Raw_sound rootStockContext inner true valid (RZ_R [] 0) (RZ_R2 [] 0)
+      fuel k₀ 1 (entry.state k₀).1 entry.stock _ hd witness entry.exact_raw_tags k' size renamed minimum ready'
+
+lemma ignoreOrbit_sound : RejectSound true (RZ [] 0) (mz 0) (tz 0) ignoreOrbit := by
+  intro k t z ws S k' _ _ _ _ _ h
+  simp [ignoreOrbit] at h
+
+noncomputable def orbitThirdCheck := orbitCheck ignoreOrbit 3 12 11
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitThird0 : rangeCheck orbitThirdCheck 0 65 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitThird1 : rangeCheck orbitThirdCheck 65 59 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitThird2 : rangeCheck orbitThirdCheck 124 68 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitThird3 : rangeCheck orbitThirdCheck 192 68 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitThird4 : rangeCheck orbitThirdCheck 260 68 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitThird5 : rangeCheck orbitThirdCheck 328 68 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitThird6 : rangeCheck orbitThirdCheck 396 68 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitThird7 : rangeCheck orbitThirdCheck 464 68 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitThird8 : rangeCheck orbitThirdCheck 532 68 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitThird9 : rangeCheck orbitThirdCheck 600 68 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitThird10 : rangeCheck orbitThirdCheck 668 55 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitThird11 : rangeCheck orbitThirdCheck 723 52 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitThird12 : rangeCheck orbitThirdCheck 775 66 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitThird13 : rangeCheck orbitThirdCheck 841 24 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitThird14 : rangeCheck orbitThirdCheck 865 68 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitThird15 : rangeCheck orbitThirdCheck 933 68 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitThird16 : rangeCheck orbitThirdCheck 1001 52 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitThird17 : rangeCheck orbitThirdCheck 1053 68 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitThird18 : rangeCheck orbitThirdCheck 1121 37 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitThird19 : rangeCheck orbitThirdCheck 1158 18 = true := by decide +kernel
+
+abbrev orbitThirdAppend := @rangeAppend orbitThirdCheck
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitThirdAll : rangeCheck orbitThirdCheck 0 1176 = true :=
+  (@orbitThirdAppend 0 668 508 (@orbitThirdAppend 0 328 340 (@orbitThirdAppend 0 124 204 (@orbitThirdAppend 0 65 59 orbitThird0 orbitThird1) (@orbitThirdAppend 124 68 136 orbitThird2 (@orbitThirdAppend 192 68 68 orbitThird3 orbitThird4))) (@orbitThirdAppend 328 136 204 (@orbitThirdAppend 328 68 68 orbitThird5 orbitThird6) (@orbitThirdAppend 464 68 136 orbitThird7 (@orbitThirdAppend 532 68 68 orbitThird8 orbitThird9)))) (@orbitThirdAppend 668 265 243 (@orbitThirdAppend 668 107 158 (@orbitThirdAppend 668 55 52 orbitThird10 orbitThird11) (@orbitThirdAppend 775 66 92 orbitThird12 (@orbitThirdAppend 841 24 68 orbitThird13 orbitThird14))) (@orbitThirdAppend 933 120 123 (@orbitThirdAppend 933 68 52 orbitThird15 orbitThird16) (@orbitThirdAppend 1053 68 55 orbitThird17 (@orbitThirdAppend 1121 37 18 orbitThird18 orbitThird19)))))
+
+lemma rejectThird_sound : RejectSound true (RZ [] 0) (mz 0) (tz 0) rejectThird :=
+  rejectOrbit_sound ignoreOrbit_sound (by decide) (by decide) orbitThirdAll
+
+noncomputable def orbitSecondCheck := orbitCheck rejectThird 2 13 12
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitSecond0 : rangeCheck orbitSecondCheck 0 11 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitSecond1 : rangeCheck orbitSecondCheck 11 14 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitSecond2 : rangeCheck orbitSecondCheck 25 14 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitSecond3 : rangeCheck orbitSecondCheck 39 14 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitSecond4 : rangeCheck orbitSecondCheck 53 6 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitSecond5 : rangeCheck orbitSecondCheck 59 1 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitSecond6 : rangeCheck orbitSecondCheck 60 3 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitSecond7 : rangeCheck orbitSecondCheck 63 14 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitSecond8 : rangeCheck orbitSecondCheck 77 4 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitSecond9 : rangeCheck orbitSecondCheck 81 10 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitSecond10 : rangeCheck orbitSecondCheck 91 8 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitSecond11 : rangeCheck orbitSecondCheck 99 1 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitSecond12 : rangeCheck orbitSecondCheck 100 3 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitSecond13 : rangeCheck orbitSecondCheck 103 14 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitSecond14 : rangeCheck orbitSecondCheck 117 14 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitSecond15 : rangeCheck orbitSecondCheck 131 12 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitSecond16 : rangeCheck orbitSecondCheck 143 11 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitSecond17 : rangeCheck orbitSecondCheck 154 14 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitSecond18 : rangeCheck orbitSecondCheck 168 6 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitSecond19 : rangeCheck orbitSecondCheck 174 7 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitSecond20 : rangeCheck orbitSecondCheck 181 14 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitSecond21 : rangeCheck orbitSecondCheck 195 10 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitSecond22 : rangeCheck orbitSecondCheck 205 9 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitSecond23 : rangeCheck orbitSecondCheck 214 11 = true := by decide +kernel
+
+abbrev orbitSecondAppend := @rangeAppend orbitSecondCheck
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem orbitSecondAll : rangeCheck orbitSecondCheck 0 225 = true :=
+  (@orbitSecondAppend 0 100 125 (@orbitSecondAppend 0 60 40 (@orbitSecondAppend 0 39 21 (@orbitSecondAppend 0 11 28 orbitSecond0 (@orbitSecondAppend 11 14 14 orbitSecond1 orbitSecond2)) (@orbitSecondAppend 39 14 7 orbitSecond3 (@orbitSecondAppend 53 6 1 orbitSecond4 orbitSecond5))) (@orbitSecondAppend 60 21 19 (@orbitSecondAppend 60 3 18 orbitSecond6 (@orbitSecondAppend 63 14 4 orbitSecond7 orbitSecond8)) (@orbitSecondAppend 81 10 9 orbitSecond9 (@orbitSecondAppend 91 8 1 orbitSecond10 orbitSecond11)))) (@orbitSecondAppend 100 68 57 (@orbitSecondAppend 100 31 37 (@orbitSecondAppend 100 3 28 orbitSecond12 (@orbitSecondAppend 103 14 14 orbitSecond13 orbitSecond14)) (@orbitSecondAppend 131 12 25 orbitSecond15 (@orbitSecondAppend 143 11 14 orbitSecond16 orbitSecond17))) (@orbitSecondAppend 168 27 30 (@orbitSecondAppend 168 6 21 orbitSecond18 (@orbitSecondAppend 174 7 14 orbitSecond19 orbitSecond20)) (@orbitSecondAppend 195 10 20 orbitSecond21 (@orbitSecondAppend 205 9 11 orbitSecond22 orbitSecond23)))))
+
+lemma rootReject_sound : RejectSound true (RZ [] 0) (mz 0) (tz 0) rootReject := by
+  have second : RejectSound true (RZ [] 0) (mz 0) (tz 0) (rejectOrbit 12 2) :=
+    rejectOrbit_sound rejectThird_sound (by decide) (by decide) orbitSecondAll
+  intro k t z ws S k' rep size live short ready found
+  simp only [rootReject, Bool.or_eq_true] at found
+  exact found.elim (second rep size live short ready) (rejectThird_sound rep size live short ready)
+
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
 lemma rootStart_eq (H : ℕ) (kind : Bool) :
-    startPairPicked I.NN I.AA I.HX I.HY I.AA rootPreparedMask rootPreparedSlots rootPreparedBudget
+    startPairPicked rootReject I.NN I.AA I.HX I.HY I.AA rootPreparedMask rootPreparedSlots rootPreparedBudget
       14 1 0 H 0 rootPreparedWords kind =
-    initialBinary H kind (look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1) := by
+    initialBinary H kind (look1RawC rootReject I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1) := by
   have haveRequired : hasP 0 rootPreparedWords = true := by decide +kernel
   have len : rootPreparedWords.length = 8 := rfl
   have budget : Nat.beq
@@ -6736,17 +7817,17 @@ lemma rootStart_eq (H : ℕ) (kind : Bool) :
   simp only [startPairPicked, child, st_eq, topPairPicked, bR, haveRequired, len, budget,
     show Nat.ble 8 (Nat.sub 15 1) = true from rfl, show Nat.ble 8 1 = false from rfl,
     Bool.cond_true, Bool.cond_false]
-  change (bif initialBinary H kind (look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots
+  change (bif initialBinary H kind (look1RawC rootReject I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots
       14 14 13 1) then true else false) = _
-  cases initialBinary H kind (look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots
+  cases initialBinary H kind (look1RawC rootReject I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots
       14 14 13 1) <;> rfl
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
 lemma initialBinary_of_check (H : ℕ) (kind : Bool)
-    (h : chkPairPicked [] rootBounds 0 14 1 H 0 kind = true) :
+    (h : chkPairPicked rootReject [] rootBounds 0 14 1 H 0 kind = true) :
     initialBinary H kind
-      (look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1) = true := by
+      (look1RawC rootReject I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1) = true := by
   rw [← chkPairFast_eq, chkPairFast, searchInputs_atRoot] at h
   simp only [guardStart, rootStart_eq, bR] at h
   cases hp : relevantStart 1 H 0 rootPreparedWords
@@ -6792,8 +7873,8 @@ lemma frontierMissing_false {states : List (ℕ × List W)} {z : ℕ} {v : List 
 lemma initialBinary_from_frontier (H : ℕ) (kind : Bool) (states : List (ℕ × List W))
     (complete : initialBinary H kind (frontierMissing states) = false)
     (checked : ∀ state ∈ states,
-      look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1 state.1 state.2 = false) :
-    chkPairPicked [] rootBounds 0 14 1 H 0 kind = false := by
+      look1RawC rootReject I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1 state.1 state.2 = false) :
+    chkPairPicked rootReject [] rootBounds 0 14 1 H 0 kind = false := by
   refine Bool.eq_false_iff.mpr fun h => ?_
   have original := initialBinary_of_check H kind h
   unfold initialBinary at original complete
@@ -6913,8 +7994,6 @@ noncomputable def opening_13_or : List (ℕ × List W) := [⟨0x8ce739c6339ce93a
 set_option maxRecDepth 100000 in
 theorem opening_13_or_complete : initialBinary 0x80000 true (frontierMissing opening_13_or) = false := by decide +kernel
 
-abbrev SearchState := ℕ × List W
-
 noncomputable def pureAt (e : ℕ) (state : SearchState) (f : ℕ → List W → Bool) : Bool :=
   nodeC I.NN f true I.AA rootPreparedMask rootPreparedSlots e state.2.length state.1 state.2 pairsS
 
@@ -6929,7 +8008,7 @@ noncomputable def mixedSecond (state : SearchState) : Bool :=
 
 noncomputable def afterSecond (state : SearchState) : Bool :=
   frc state.2 (fun v => st state.1 (fun z =>
-    look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 13 12 1 z v))
+    look1RawC rootReject I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 13 12 1 z v))
 
 lemma pureAt_of_covered (e : ℕ) (state : SearchState) (remaining : SearchState → Bool)
     (miss : ℕ → List W → Bool)
@@ -6952,25 +8031,11 @@ lemma pureAt_of_covered (e : ℕ) (state : SearchState) (remaining : SearchState
   obtain ⟨_, hh⟩ := hp
   exact Bool.noConfusion (complete.symm.trans hh)
 
-lemma pureAt_from_frontier (e : ℕ) (state : SearchState) (states : List SearchState)
-    (remaining : SearchState → Bool)
-    (complete : pureAt e state (frontierMissing states) = false)
-    (checked : ∀ x ∈ states, remaining x = false) :
-    pureAt e state (fun z v => remaining (z,v)) = false :=
-  pureAt_of_covered e state remaining (frontierMissing states) complete
-    (fun z v h => checked (z,v) (frontierMissing_false h))
-
-lemma pureSecond_from_frontier (state : SearchState) (states : List SearchState)
-    (complete : pureSecond state (frontierMissing states) = false)
-    (checked : ∀ x ∈ states, afterSecond x = false) :
-    pureSecond state (fun z v => afterSecond (z,v)) = false :=
-  pureAt_from_frontier 12 state states afterSecond complete checked
-
 lemma afterFirst_false (state : SearchState)
     (two : 1 < state.2.length) (small : state.2.length < 12)
     (mixed : mixedSecond state = false)
     (pure : pureSecond state (fun z v => afterSecond (z,v)) = false) :
-    look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1 state.1 state.2 = false := by
+    look1RawC rootReject I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1 state.1 state.2 = false := by
   have lengthOkay : Nat.ble state.2.length 1 = false := by
     cases h : Nat.ble state.2.length 1
     · rfl
@@ -6979,13 +8044,14 @@ lemma afterFirst_false (state : SearchState)
     have h0 : Nat.beq state.2.length 13 = false := beq_f (by omega)
     have h1 : Nat.beq state.2.length.succ 13 = false := beq_f (by omega)
     simp only [tstC, bR, h0, h1, Bool.cond_false]
-  rw [show (14 : ℕ) = Nat.succ 13 from rfl, look1RawC_step, lengthOkay, Bool.cond_false]
+  rw [show (14 : ℕ) = Nat.succ 13 from rfl, look1RawC_step]
+  simp only [show rootReject 13 1 state.1 state.2 = false from rfl, lengthOkay, Bool.cond_false]
   change tstC I.NN I.AA I.HX I.HY true I.AA 13 state.2 _ = _
   rw [choose0]
   simp only [afterSecond, frc_eq, st_eq] at pure
   simp only [mixedSecond, frc_eq, st_eq] at mixed
   change (bif pureSecond state
-      (look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 13 12 1)
+      (look1RawC rootReject I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 13 12 1)
     then true else _) = _
   rw [pure, mixed]
   rfl
@@ -7027,13 +8093,6 @@ noncomputable def firstStates : List SearchState := [
 
 noncomputable def firstAt (i : ℕ) : SearchState := firstStates.getD i (0, [])
 
-def secondCount : ℕ := 443
-
-def encodedSecond : List ℕ := [
-0x12068e3661a30d106863421b4052028e1070b305182881430a104082c21410bbab1918c6c436313109864c6062030c1840e10643821c90c4762ba920c8e666323192081044720391188ca443224091c48c2431210920010047003819808c06502181080040610208040, 0x104390f484a3a520e8e7463a21d20a105672a39518a885432a40d986883431a10d202101670a3859828c1440a185082041610a0855d9ecac74639b10d8e4c4261931c1880c306102081c20e8724391d82ec48423a120c8e64632219a0890447203919888c4442219042, 0x11d6909474a325152907473a29d10eae5532a4051c28c1450a2050c2061620a43a21d90ac7564231d18c8c54641b5cd8e6c53621b2058e2c61628b105862c8044031c10e0e606303141880e306183841820c7623a11908e64632219d488824312381180880430308045, 0x11c3881c30c18788390f087a42d1d6909474b3251928a9483841d1ce0e7453a21d20a8e5452a2150ca903081ab8d1c60e3451a20d4c6863031b10d0868ecc7463231cd8c6c4363921c98c4c4261931c5882c31610b1c10e0c607a83941880c306102081c20c10642847,
-0x10cb903881e38e1c7a83c41e18e0c7c43c21e43c21e905082a3941ca903471a10d2021014708385942c814208105842821487741b20d8e6c6364131c90e4e5261932058e2c31610ba01900c704383941860c204103841820d852ba92108e846424191cc88654224004a, 0x118a44290ca77099c246090c242098424757211c747191c73714dc4374c9c8071c1c4070c1e2071d148351cd453520928259c947251094325a056715a0148059c147050c142040816105dd8c533108c3230c0c203840c87021c57512104741190483020c47301cc653110c48211c844206d, 0x8c9c73e31f14f8e5872e31618b885c32eb0f1870c3c31e10e0878eb484a3a5192907473a29d10eae5542a9955c68e3441a18c0c68eae8464231d18c8e83641b1cd0e6c53621b1c9884c32638a1c5882d31618a0c5e42d21710b0858c8463229851,
-]
-
 noncomputable def transitionFromCode (width : ℕ) (parentAt : ℕ → SearchState) (entry : ℕ) : SearchState :=
   let before := parentAt (entry % 2 ^ width)
   let left := (entry >>> width) % 16
@@ -7051,253 +8110,6 @@ def relativeTransitionCode (parentWidth block index : ℕ) : ℕ :=
   let parent := base + entry % (1 <<< width)
   parent + (((entry >>> width) % 2048) <<< parentWidth)
 
-noncomputable def secondAt (i : ℕ) : SearchState :=
-  let block := encodedSecond.getD (i / 64) 0
-  transitionFromCode 5 firstAt (relativeTransitionCode 5 block (i % 64))
-
-noncomputable def secondSlice (n : ℕ) : List SearchState :=
-  (List.range (min 4 (secondCount - 4 * n))).map fun i => secondAt (4 * n + i)
-
-noncomputable def secondGroups : List (List SearchState) :=
-  (List.range ((secondCount + 3) / 4)).map secondSlice
-
-def successors0 : List ℕ := [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32]
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-lemma successors0_complete : pureSecond (firstAt 0) (frontierMissing (successors0.map secondAt)) = false := by
-
-  decide +kernel
-
-def successors1 : List ℕ := [33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44]
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-lemma successors1_complete : pureSecond (firstAt 1) (frontierMissing (successors1.map secondAt)) = false := by
-
-  decide +kernel
-
-def successors2 : List ℕ := [30, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81]
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-lemma successors2_complete : pureSecond (firstAt 2) (frontierMissing (successors2.map secondAt)) = false := by
-
-  decide +kernel
-
-def successors3 : List ℕ := [78, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95]
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-lemma successors3_complete : pureSecond (firstAt 3) (frontierMissing (successors3.map secondAt)) = false := by
-
-  decide +kernel
-
-def successors4 : List ℕ := [29, 79, 94, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126]
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-lemma successors4_complete : pureSecond (firstAt 4) (frontierMissing (successors4.map secondAt)) = false := by
-
-  decide +kernel
-
-def successors5 : List ℕ := [127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141]
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-lemma successors5_complete : pureSecond (firstAt 5) (frontierMissing (successors5.map secondAt)) = false := by
-
-  decide +kernel
-
-def successors6 : List ℕ := [19, 66, 67, 115, 135, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172]
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-lemma successors6_complete : pureSecond (firstAt 6) (frontierMissing (successors6.map secondAt)) = false := by
-
-  decide +kernel
-
-def successors7 : List ℕ := [14, 60, 61, 111, 157, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192]
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-lemma successors7_complete : pureSecond (firstAt 7) (frontierMissing (successors7.map secondAt)) = false := by
-
-  decide +kernel
-
-def successors8 : List ℕ := [193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218]
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-lemma successors8_complete : pureSecond (firstAt 8) (frontierMissing (successors8.map secondAt)) = false := by
-
-  decide +kernel
-
-def successors9 : List ℕ := [6, 7, 51, 52, 102, 103, 148, 149, 178, 199, 200, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250]
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-lemma successors9_complete : pureSecond (firstAt 9) (frontierMissing (successors9.map secondAt)) = false := by
-
-  decide +kernel
-
-def successors10 : List ℕ := [59, 110, 134, 156, 206, 233, 251, 252, 253, 254, 255, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265]
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-lemma successors10_complete : pureSecond (firstAt 10) (frontierMissing (successors10.map secondAt)) = false := by
-
-  decide +kernel
-
-def successors11 : List ℕ := [77, 93, 125, 140, 170, 192, 217, 248, 265, 266, 267, 268, 269, 270, 271, 272, 273, 274, 275, 276, 277, 278, 279, 280, 281, 282, 283, 284, 285, 286, 287, 288, 289]
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-lemma successors11_complete : pureSecond (firstAt 11) (frontierMissing (successors11.map secondAt)) = false := by
-
-  decide +kernel
-
-def successors12 : List ℕ := [41, 72, 91, 120, 136, 165, 187, 213, 242, 290, 291, 292, 293, 294, 295, 296, 297, 298, 299, 300, 301, 302, 303, 304, 305, 306, 307, 308]
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-lemma successors12_complete : pureSecond (firstAt 12) (frontierMissing (successors12.map secondAt)) = false := by
-
-  decide +kernel
-
-def successors13 : List ℕ := [5, 36, 50, 86, 101, 130, 147, 177, 198, 225, 271, 295, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334]
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-lemma successors13_complete : pureSecond (firstAt 13) (frontierMissing (successors13.map secondAt)) = false := by
-
-  decide +kernel
-
-def successors14 : List ℕ := [31, 171, 249, 307, 333, 335, 336, 337, 338, 339, 340, 341]
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-lemma successors14_complete : pureSecond (firstAt 14) (frontierMissing (successors14.map secondAt)) = false := by
-
-  decide +kernel
-
-def successors15 : List ℕ := [32, 80, 81, 95, 126, 141, 172, 218, 250, 289, 308, 334, 341, 342, 343, 344, 345, 346, 347, 348, 349, 350, 351, 352, 353, 354, 355, 356, 357, 358, 359, 360, 361]
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-lemma successors15_complete : pureSecond (firstAt 15) (frontierMissing (successors15.map secondAt)) = false := by
-
-  decide +kernel
-
-def successors16 : List ℕ := [16, 63, 112, 159, 207, 235, 279, 302, 322, 351, 362, 363, 364, 365, 366, 367, 368, 369, 370, 371, 372, 373, 374]
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-lemma successors16_complete : pureSecond (firstAt 16) (frontierMissing (successors16.map secondAt)) = false := by
-
-  decide +kernel
-
-def successors17 : List ℕ := [10, 106, 152, 202, 229, 298, 317, 375, 376, 377, 378, 379, 380, 381, 382, 383, 384, 385, 386]
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-lemma successors17_complete : pureSecond (firstAt 17) (frontierMissing (successors17.map secondAt)) = false := by
-
-  decide +kernel
-
-def successors18 : List ℕ := [11, 55, 56, 87, 107, 132, 153, 180, 203, 230, 256, 274, 275, 299, 318, 348, 349, 366, 379, 380, 387, 388, 389, 390, 391, 392, 393, 394, 395, 396, 397, 398, 399, 400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410]
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-lemma successors18_complete : pureSecond (firstAt 18) (frontierMissing (successors18.map secondAt)) = false := by
-
-  decide +kernel
-
-def successors19 : List ℕ := [0, 45, 96, 127, 142, 173, 193, 219, 251, 266, 290, 309, 362, 387, 389, 411, 412, 413, 414, 415, 416, 417, 418, 419, 420, 421, 422, 423, 424, 425, 426]
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-lemma successors19_complete : pureSecond (firstAt 19) (frontierMissing (successors19.map secondAt)) = false := by
-
-  decide +kernel
-
-def successors20 : List ℕ := [1, 33, 46, 82, 97, 128, 143, 194, 220, 267, 291, 310, 335, 342, 375, 388, 390, 427, 428, 429, 430, 431, 432, 433, 434, 435, 436, 437, 438, 439, 440, 441, 442]
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-lemma successors20_complete : pureSecond (firstAt 20) (frontierMissing (successors20.map secondAt)) = false := by
-
-  decide +kernel
-
-noncomputable def groupChecked (group : List SearchState) : Bool :=
-  group.all fun x => !afterSecond x
-
-def indexValid (i : ℕ) : Bool := decide (i < secondCount)
-
-lemma secondAt_mem (i : ℕ) (valid : indexValid i = true) :
-    ∃ group ∈ secondGroups, secondAt i ∈ group := by
-  have hi : i < secondCount := of_decide_eq_true valid
-  have block : i / 4 < (secondCount + 3) / 4 := by omega
-  have hn : i % 4 < min 4 (secondCount - 4 * (i / 4)) :=
-    lt_min (Nat.mod_lt _ (by decide)) (by omega)
-  refine ⟨secondSlice (i/4), ?_, ?_⟩
-  · exact List.mem_map.mpr ⟨i/4, List.mem_range.mpr block, rfl⟩
-  · apply List.mem_map.mpr
-    refine ⟨i%4, List.mem_range.mpr hn, ?_⟩
-    congr 1
-    omega
-
-lemma checkIndexTable (tableGood : secondGroups.all groupChecked = true)
-    {ids : List ℕ} (wellFormed : ids.all indexValid = true)
-    (state : SearchState) (inside : state ∈ ids.map secondAt) :
-    afterSecond state = false := by
-  obtain ⟨i, hi, rfl⟩ := List.mem_map.mp inside
-  obtain ⟨group, hg, member⟩ := secondAt_mem i (List.all_eq_true.mp wellFormed i hi)
-  have good := List.all_eq_true.mp tableGood group hg
-  have hit := List.all_eq_true.mp good (secondAt i) member
-  cases result : afterSecond (secondAt i) <;> simp [result] at hit ⊢
-
-def thirdEncodedStocks : List ℕ := [
-0xc5b0ffdb34bffa4d0ffe7643ff6d927fdb547ffce52fff54c9ffd9b0fede347ff74b07fa93c7ffa6337feb84dffddb37ff7ac3ff3c90ff9f3c9df7cf0fef59c7ffdf397fe7245d72191ffcd0c1fd8490ffdf2c3ff0b30feb26c7ffb676fdeb343ff31b35fa99c9f7, 0xb4f1fbcc3497f7b71fff51c5fe08d07f617cffbce13eff5c4d7fd71277f4a47ff8dd07f5d64bffbd90ffcad47ff8cb07f61341fddc307f5f641fd209077ad9c1fd0870fe8a95fffbeda6befb67cf213277b39c7ffd0707f6b3cd7fd4907fe2b67df8c70ffdd6cdff, 0x24717f9e2c7ff78507fe12c1fdddd6fff185bff2234ffdec41fda6137fe7859ffddb2fff7a43ffc4d25fcc2c9fe7553ff697d9ffcdb67fccccd7f3332efcccc9dfb4d277d71c5fecb76eff2d5bdf74307f42dc1fd8d127fdf44dffd510ffcb0c1fdc5735fde4c5ff, 0xcdb577e1741fd6d91ffe53c7ef8cd0dfe57c1ffdb7b4fdb543fbdf5c5fc80c1ff9d7277debc1fdbcb26fdebebff7b1a7fed2c9dfb5f07fe33437a8470fff56d5dfd6735ff59c9df0b7a7fc8649df22307fdf6c1fdde75eff26c3fb08b07f51243ffac717da3847ff,
-0x2b535fcad4bbf2b5277f794d7fde52efdd7d1ff85127fdf44bffcd10fff7d6f7fd9d27fd55c7fddad0fff31c5fedb794fe55c5f7c5517ff51c1ff82d277f19c1ffc4b27fb3c4d7fcf12eff3c49dfd6f35ff5bcbbfd6f277f7b4d7fded2eff7b49dfb6b07fe28c97b, 0x94917df69dbf7c5d7fbe2ce37b8b386eed8ddef8e135fe1343fede10eff4947ef8d11ffed9dfdf9cb27f95349ffce72eff39c9dfd6517dca2c9bf0b347ff13c9ffbcb27f9edcd7f7b72eff3bcbbfcef277ed3cdffa4717db6943ffdf59dff4a4bbf24707ff2c45ff, 0xd4d05ff5241dfb6357ff59cfff6d30ffe3245ff7cd17ff5143ff6d90fedd441fd94f37ff2ce59fd5335ff54c9dfc631fbed85defc6b77bef545ffcc707ff58c5ffbe707fe1447ffb6907fe73c9ffd1d6feed743ef2450fff3945f76c307fed9dbd7a67275e28c77b, 0xd350d7e55c9ff84917fdf2c5ffcc50ffe16c1ffc8d1ffe53cbff75527fed543ffb670775b345f796357ff5949ff0b517fef8c7efddd1fbf1847efda707f616d3ffddf17fde4c1fdce317ff5957ffd6117fef3c9ffb4f2ffdd347efc470fbcd241fec5f57ff5755ff,
-0xcc9077f76c5f7c8297ff5ce5ff34507f5f243ff9db57dd32c9fecd32eff34c9df8c717fdf5c3ffce17eef1a5defc5917ff2943ff30d2dfb76d97f94717995347ff7c90fea344d7f44d0ff82b55ff21b3ffc8949de9550fff2963ff74b1fbef1c3efc5d07b5d7c5ff, 0x34707fb184dffc632fff7c43ffc6b05fe92c9be9cb277b53417c2c507f42955ff31d35fb1343ff9cd0ffdb349ff64d27feb243ff83186ee5855ffce527fc2cc5ffbe11fbe0141fd6d737fef645ffd35857f7141fd2258fff3845ff9cf1ffd52c7ff2c907fb32c1bf, 0xc5b4fbc90c1fd2c707fb13cd7f5c307f611c5ffccb06f1d34bffbcd0fff12c3ff75927fc8dc7ffb590ffca34bbe64b27fe3241fd7cd07f750c1fdb5d47be78cdffae327feb7cdffd5b37ff5ac3ff9d507f7494bff30b0ffe2de13bd9d0fec8961ffbe337ff774dff, 0x75b27fed5c9dfb5b0ffdb2c9ffa490ffc8349df08907f59347ff8df1ffc25c1fdc511fbeb75fffc5f6fff575bffb636ffe784dffde70ffe98c9ffae127ff76c9ff9df67fe97cdffadf2fff36cdffceb0fff56cbffd690fff58c1fd54f27f4a343ffadb37dcf1c5fe,
-0x96167fe1241fd7cb07f730c1fdc9d0fef7b57bfacd07f42d41fd9590ffef84dffddd2fff7bc3ffae31ffef447efc612ffef7d9ffcdd67fed859ffbe906ff77c1fdce307f72dddbfcb5777f5841fdde78ffe73c9dfdeb7fff3ae3ffd698fff5ae1ffdf56ffdf1c3ff, 0xcdb2fff3a43ffd6535ff5949df7d127fc2cc1fddad17fe76d9f70b79ffef6d3ef0b3affc2d69ffde116ff7957bf54f1ff73841fdde787ff7a5fff7c90f6b3a63ffceb87ff7cdbffd6987ff5755dfd6d35ff5b49df0b7bffe33457f3450ff9d7c1fdd5f47ff7adbf7, 0x8df0fedf343fed630dff57c3df1c307f653c5f78af1fbc82c9df7a507f62cc5ffd0717fb3755df9c717d992c7ff8c707f617c7ffadd07f716c1fd88917fe975fffbdf6fff375bffb616ffeb2c1fda4d07f67641fda6127fc8dcd7f2372efc8dc9df7550fee97cbff, 0x6cd0fec83cdff94b27fa97d1f7ce52eff3949df44907f621c5ffa611ffd32c3ffda57ffed545ffced2eff3b49dfb4b27fad9c1ff4d127f77d657f34307fdf243dfadf47df4bcbbfdf5b5fe11c1fda631ffeb847ffddb1ffd3343ff64f27f63243fe8df35fe37c9df,
-0xd6d3ffed1c3efb5d7fbdd643fb8c307e633417d34307f1d5c7ef8490ffa17cbbf85f277e17c3fbce10efeb8cd7facd0ff9f447ff7d717ff6247ff88897fe3341fcde17efe385ffbce386ff58e17fd617f7ed3c9ff74307fe9741fdbdb07f4b0c1ffa4b07f6b3437f, 0x21d3ffdf245ff7db07fe53c9ff08307e422c1ffc5f1fbf5747efb631fbed741ed85d07fd93c7fdda507f719ddefb6b77bdf6d3ffd5f17ff4143ffa6335feb84d7fa4d0ffb76cd7fddb2eff76c3fb88907f7594fffd2517df6b41fddb76cff7ae1bf7491fbf4d455f, 0x24507f758d17fd5f477e12c1bd84307e4b0c1fc30d25f97141fd9470fbdb245f795f57fc2341fcc4707b6f7c7efcdd1fbed847efc6b1fbeda5defbed6fbefb59efddd65fdb4c1fdcdf17fe32c1fc84d07f37841bd7b1adfe2a49ffce53ffe58c7efadf17df56c5f7, 0x3c307f5d349ffc490fff5141fdb4d0ffcd2c9ff21927795247ffcb36e7c22c1fc75737ff15c3ff4490ff9f449df7d10feefac7efc691fbe0c45ff3090fff7c45ff84b07f20349ff7afa6ff4845ffde986ff7349ff33335fb534bffd551ffe5847efc6757fedad5ff,
-0xcf18fff5be3ffd7187ff7d5dffded8ffe0b61bbbc707b5b5c9ffd350574c3477e88707f73141fd8cd0dfb18c9ffc5f37ff574dffd710ffed8cdffd5927fed541fdac507d697c5f7cdb17df7bc5ffadf5fff56d7ff8b715ff2941fdbcb26fad2c9de7c717fed645ff, 0xc6127ff7749ffbdf37ff17cbffcdd37ff3c43ffd5d2fff5bc3ffb5f67fed84dffb632ffed447efded0ffe0961bbdcb27fde7cddbccd2ffcad4bbed5f07f6d9c1dfa4507d617d1fbce146fcc849ff31f2ffcccc3ff96337fe7243ff21b2779b543ff95507f77c5fff, 0xd697fff5cdbffd5535ff5549df74b27fca8c9ffbc90ffca7cdff2b50ffed2c3ff96137fe58cbffde50ffca2c9be7c907f75adbf79e327fe77cdffadf27ff56c9ffd670ffdeddfdbb633feefa47efc5d07bc8643ff7d707f65343ffc9b0fff4d695f8a91ffef8c9ff, 0x34507fcd2c7ff6491ffc9143fe7c9177df143fbc4d07f6775fffb5f6ffe7341fdde58ffe7849ffac907f616d5ff9df2ffe97c9ffcdb27ff39c3ffd0307f4a243ff9db37de0347ff94b0ffeb6c9f7dcd1fff5647ff79f2f6ed3c9dfde77fff39e3ffceb7fff59e1ff,
-0xbe127fef7cbffadf1fff374bffcef0fff56c7ffd6315ff57c5dfb612ffed641fdbeb37ff7961ffc6767ff1a4dffc6b2fff37c1fdb6b67fe58cffbd6b07f746cbffd290ffc2cf1ff0b5bffc2dedff95f67ff7bdfffcef8fff3c61ffdf377ff5be1ffded87fdd1c3eb, 0xbcb07f772c7ff85f17ef3647ffce116fe09c1fdbe937fef9d9ffc692fff2dc7bfcb51f7eda59ffde707f6584ffbceb07f75a41fd3211fff1449ffb5137ff79dbf79612fff3adbf76d71ffed84ffb0b797ff53417e28b1efb1add6fc5d6faef341fd9e31fff12c1fd, 0x74d0fecd141fc9e11fff13437f4c90ffe97c7ffcdb1ffe3241ff7c90ff9f341ffd4307ff2c6b7f30d0dfe31c5fe95907f634c9ff7d337ff54c3ffdcd2eff5547df2a31fff1ad57f2c507fe2947ef7c707f67741fd24307fed6c1fd9cb07f69241fd5570ff62b47ef, 0x2c507f1f3c5ff75f07ff18cd7fc630fef1343fe84907fdf2c1ffcc307fe78cd7f9cd0ffa78c9dfac90ff82557fdadf35feb7c9dfadf0fef3a41fdd5b35ff564d7fd5b277f5649dfd5b0feef449ffb512fff76d7bf85327fdf4cbffcd30fff3547df1c50ffb32c1be,
-0xbe335fef343feddd35ff774bbfddd0fef184d7fc612eff1843fbdcd2dff76497f64b27f9f341fccd92eff3649dfd6305f757c1dd8a727fefa55bfcb734ff2ccd9fd6b8dff5adfdfcb5357cc84d7f3212efcc843fbdb774fe7243df6c90fef7c61bf74f1fbc2241ff, 0xcdb277f36c3fb96317df15c5ff0b307feb6cd775cd27ff4747efbed2fbf5c45ff8af27fe2b4bffde786feb85ffbceb86ff5a637fd697f7f7d5b7f1c307fc2cd3ffd55357ca8cd7f28d0ff890c1fc7c90775f0c1f97a507ff7bedef84717fad7c7ef8c707fefb4def, 0xc6b65fe17c1f97cb07f33841bdcb3767eb341fcd4d27fc8645ff95f1fbe77c5f7c8d0fff7be1bf9450fdf1ac5f7cd52e7cf141fd33317fed9ddefadd07ff16c1ff75f6feeb3417d8a52ffe7849df6cb27fa9243fe20d27795343ffa5f2efe97c9dfa5f0fef36cbbf, 0x20d0ffeda47ef82d17ff76477fcf117ff5bc5ffded17fefa59bf8a71ffdf3c1fdd0507f6b2c1fca4d07f08dc9dea617fef3a61bfccd27ff52c9ffc5135fc83c7ffc5f5fff5757ffd1b17ded8d7ffc5327bed1c1ed84707ff19c7ef78d17fedac7efa5d07fef6c1ff,
-0x952fff2743ffd35bd7e5243ff7b717ff3bc5ff8d335fe34c3fb4cd0ff82b57ffa4b07f297cfffcdb3fff58df5f9570fff1a45f7d7337ff7d49ff2b517fdd6c1f921d2779d543ffb490ffe92c1bd6cf27fc82c9de54b0ffe5845f775727fed5c3ffd9b07f6f9c7ef, 0x2232ffc8dc3ff8532efe14c3fb96327fe57cdffd650fff3c5fffd6f7fff5cddffced8fff5b61ffded7ffe58d7ff78b17fcd247ff8c307ee33417f34307fb17c9ff7c90f7b5749ffb5f37fed8c9ffd6d0ffdf6d5ffd658ffe7141f55cd1ffe51c1edc4717b882c3ff, 0xd5317ff6b67dfdf51ffc20c1fb9615ffc2d65ffb5d07bdb3c7ff84b06fe10c1fb2c307fb1241fd85d57fef7c9ffcdd27ff5347ffb5f2ffed849ffced0ffed341fdacd0df9b343fac6737ff1ac9ff2233feedacdff5cb1ffef1c5ee88717faf4c9ef30907f4884dff, 0xd6587ff11c1ef55717f675c1fd9db27de0247ffdc91fff3347ffd4b1fff5141ffbe737fe33417cdd92cff19cbffbeb27ff1a49ffd7107f7474bffd2f0ffeda4dffb6b2ffe29c9dfd6707f4c7c7ff0a55ffe5849ff22b67fc83c9df95f2fff3943ffd676fde0d47ff,
-0xce587fed9d9ff08307e022c1febc707bdb343ff21907f65341fd79f1f6f32c7ffc9b07f60b41fd8319fff3c41fdd6f07f60b6bffded07f77c67ffcf1afff5bebffd71a7ff7b6bffac507dd92c3ff2c91ffc9141ffa677fdf39dbf79c907f5b541fdde57fff3963ff, 0xbe927fdea4dff7ab2fff46c7ffb692fff39c1fdd4d277e2945f7b5127fe30c1fd28907f652c1fdcd317ff7cc7ffdef9fff3bebffcf1a7ff5be9ffdeda7fe2de77fad317dc2ce5ffb67773ed75bebd6d47fe0941fdbc907f677c7ff78d07f6d2c1fdde507f553c3fd, 0xccd2eff3349dfd4d2dff52c9dfd5f07fe9141f729f1ffed9d5df84307f77757bfa6707d616cdffddb0fff14cd6f3090ff8c7cd7f31f277cc7c3fbdb724ff57d3ff83535fe0d49dfa5317df7d4d7fdf52eff7d49dfc6b1dbf2c5def8e107f5e2c1fdcc507fe12c1bc, 0xad327ff5c637fd717f7e2b49ff7490fef2345ffb490f7df241ffd9d17fdf443ffb6b47defa47af7c717fb1755efde16fff1243fec5f35ff17c9df7d327ff17c3fb7b707f73bc1fdd5d35ff5749dfd5d0feed8cd7fb63277ed8c3fbb4d0ffb73497fdcb26fcd2c9fe,
-0x9db275e58cd7f9630fee5343fed6fb7be74cbffa5327ff185ffbcf186ff5be37fd6f7f7f7d5d7fded86ff72c9fedf335ff7ccbbfdf3277f7d4b7fd890ffd5345ff3217feccce1bf9cd07fe7243feac907fe77c9df9df0feeda51f7c4f17fefb49ef4c907f674cdff, 0x7c707ff13417d74b27faf243fe54b17fef7cbbfbdf277ef7c3fbcdd2eff3749dfcdd0fecad637f2b57f7ed84bbfb61277ed843fb9cb07fdb1c5f6de586ff1acd7f4d10ff4f349ffa4907ff32c9df85f47ff59e37fd677f7f46c3fbb5717fcc3417d6d907f6f4cbaf, 0x95f17dcd141fedcd1dff72c7bfd6d17fefacd7fbe936ff1a4d7fc6b2dff1a4bbfc4d07f0f2c9ffb67677e7341fc8d527fe785ffb7d537fe2ce5ffce786ff5543ffc9d17ff6dc73f2890ff8a7cbbf29f277ca7c3fb9612efe5843fb44307f60c6b7f8a527fc7141fc, 0xbdf3fff374fffd2f17fed84fffdefa6fe3747efc5d6fbd9345ff8df17fed9c7efbcb06f5d3c9ffb4f0ffde447ffd9d07f5ec47efced17fef341fcc4b07f2f85ffbcef86fe28c179df1adff19c5f7b6b17dc8dc5ff75517fe7741ffb5b07fe7241dd5490fff61c3ff,
-0xd6305ff57c1df7ab17deda45f7c870fff55c7ffd35957cc3437ec675ffedad7ff82136ee1747ef94507d758d37fd5f4f7c2549ff95f5ffcb141fe3cd1ffdd1c3ef24307f9d7d5ff7c9077df0c1fbcb31e7e72c1fc9df3ffdf143ffb51277ca2c1bd94f0ffef2c1fc, 0xd719fff5b6bff8c507f592c5ff85f17fcd2c3ff23167fc8247de5470fff28c7ff9613fff2addffcb16fff1ad17785f4fef3853bfd657fff4943ff5c91ffdebc7efb4717b8f2c7ff74d0feb13437e4c90ffa3547ff54f17f5f4c9df7d30fef5247ffdcd2cfdf341fe, 0x8cd2ffcc84d7edcd0ffdd541fdb4907f673c1fdacd05ff19c9ff9c90f79b243fa237affeb755ffc5b57ff395fff3339ffed9cdffb6b27fc50c1fd0951ffed5c1fd20d07f6fb4bafbed273e57c9ffad335fe17c1fb7cb07fb3841bf8ad277f5b41fd75917fdea45f7, 0xb4707be134bffdcb0ffe1547ffcc91ffe92c1bfbe727fe9755ffbdb57fed9cbffb6927ff4961ffdad77bdd343ff0b10fe888c7ff6490ffc82c1fdc9d07f65241fda532eff2087ffd731ffde1c5ffcf19fff5be7ffcedafff5b69ffded9ffe1141fd95707f72df51f,
-0x6c90ffed9c7cf7af37fdec4bffd0b1fff3b41fdacd05f22de57f8a587ee354d7f8d50fed5343fe7d53ff753497fd550f7e7141f794707bc8847ff7c307f636c9ffdd726fc8dc1fd7db37feb7c3ffd5735ff55c9dfd5b0fff5941fd08d2ffe2ded7f8ad87ee74c5f7, 0x64f17f617c1fdae307f698dfffae17fff77dbffce36fff585bff0b72fff785dffc6b15de174dffddd0ffdd447efc610ffdd6c1fbc699fde16c9ff85927fdf6cbff7d92ffe97c3ff8df07f736c3ffcd90fff3941fdca335ff2dc3bfca30fef2343fecb50f7f6245ff, 0xcb11fbdeac7ffb5d57be98c1fdae107f776c1fdc4907fed7c9dfb5f0feed243feb4d07fe92c1bc8552efe1543fbccb26ff3543df6470ffeb0c1fd6cd07f488cd7f223277c88c3fb20d0ffafb4fefd6d8dff5b5fdfc820fef5ccd7fd732eff7d497fd73277f52c9fe, 0xd658dff595fdfc551fbed3c5ffbc907ff53477fd491f7ed2c1ff8cd05fa74c9ffd5517ff4743fbd6707fdd6c1fd75907f636c7ffdd71efdb2c1fda4307f71ad77f2212efc8849df2210fec2cd5df94d07fe5243fe95f277e57c3fbd674ffe1647ff2090f7c2543fb,
-0xc6b25ff19c9df20f277a585ffbce586fedacd7fb67377edac9df7d107f420c1facab17df6241fdbd51fbe12c1beced86fed85ffbb4d07f1f4d1fdd71adff53c9ff85b1ffc24c3fa78707f69759ffbdb67feb545f723786fd5245ff75137ff61c5ffc510ffe7241ff, 0xb5d67be14c3ff54717fe164bbf8590fef76437fa674fdcb247feccb1eff3247dfbe926fef9c9df7ab35feda4bbfb672f7eda49dfd9f1fff7c5def20f0ffe52c1ffdf51dfe0b67dfcf1adff5be9bfded9f7f174def88507f4c3457e7a91ffe9841fdb49077719cd7f, 0xc673ffdd7c7efcefa6fedacfff7a51fbed75bef34b17fd9245ff94b07f257cfffc591fbe0345ffda777ff6b5bffdcd17fcf247ffd5917fde341fcb5f3ffed2c1fcd4d257f21c5ffb6717de10c1ff8881ffe9545f7a6707de36cd7f6cd0ffb75cd3f94d07f3174bef, 0x9dd57ff32c99fb5b57fcc845ffad917df6243fe3490fff67c9dfd9f0fef33c7ff82126ed7343ffadd1fbf16c7efdcb26fb7d4b3fdf5257f52c9dec6317ff785bbf8cd27fcc7cd7e7a92eff5343ff54907f5f6c5f7d8707f6754dffad527fe0d61bb78b07f353c7ff,
-0x9d3277eb547ffddf37ff38cdffd6137ff58cbffd55177f7d43ffb693ffe7341fea5917ddf141fd2c90ffe53c1fd888277ccce5ffbd91fbc2349ffddd17fc7141fec6117ff72c5ffcd917ff13417f7490fe88df1ff7d51fff2dc5bfcb5177cccedffb490f7ad3c1fd, 0x9cb07fa9747efbdb1fbd91c5ff8cf27ef32c9ded4f35ff53c9dfd356d7e3749ff75f37ff17c3ffc8707f75743ffb630ffcc3417c84d27fe32c9ffdc90ffdf34bff7d927ff3343ffcab1fff52c3ff6c507d67241dfc530fbdf6d7ff22567fef2c1bf74707b778c9ff, 0xb610ffeb74dff34b07f716cdffc6b0ffe12c9ff54707f4a7cbbeccb0ffeda67f7acd2ffcca4d7e9d937feb649ff94507df4941fd30307f6f4c3ef7490ffc2dc9ff0b337fc2d4bff0ad0fea58c3ffc4d05f37849ffddf2fff384dffce32fff3545dfdf30fff584bff, 0xc617fff775fffce377ff585dffb6387fe934bffa551ffdede5ff5490ff9f549df7d50fef6b47ef3470ffeb7dbf78211eedf6c9ff9df0ffde94dff2b597fe13c9fb3cb27f822c9ffccf2eff33c9df0a50feb58d57fd5f577e3347ff85d27fdd7cbffbdf0fff3743ff,
-0xcab35fd1349ffd9d6fee5843ff8d317fef8c1fdddd07f778c7ffc6107f6f2c1bcdeb77ff1a63ffc6b87ff7c5bff14307fcb1c3ff9d53ff6d9c5d774d07f710c1fd96387fd9241fd20d07fde94bffda717df6947ef6d707f61347ff8cb1fff71c3ffc6307f6f8dfff, 0xd6507fca0c1fd44b27feb54d7fadb07d614c5ff9c307f77847ff6c907f77a5dffdef6ffe33c7fbc6987ff1acf7fd6d07fdd2c1fdbc307f63141ff7db1ffdf647ff28b06f2974dffbdb37fe7759ffc5b2fff1a43ffb5b67fe78c1fd9d92ffe9649ffadf07f756c1fd, 0x7d30ffed547ef8cd2dfe134bbf84d0fecd2c3fedcd0dff72c3bfc5d5fbdd6d5fbb67277e954bbfc5f47ff5751ffb6347fc83c5ffca51fbf6dc33fb675f7e13c7fb94907fe1141ff84b1ffd91c1fdad91ffe5557fd9e107f63343fba5f07f736c1fdb4907fc2dc7ff, 0xc4d1fbde1c5fe20907775c5def6d337feb4c3ff7b135ff78cd7fde136ff78cbbfde30fef7343feacd05faf7d1ffcdd47ff5b67dfb6147fde7d1db9551fbe7545f77c307fc8341fcc9d6fedd449ffb510ffc2343fb8ad8def1749efb5d37bef841fddd915fe9647ff,
-0xb699f5e764ffdad935fe22c9ffd636dff57dbdfdf55cfe29637b0b735fc2dcbbf0b70fef3c5defbed8fbf7b5def85f4fff784d7fde12eff7843fba4b06fa33cd7bced9f7e374d7f74d0ff8d245ffac307fdb341ff6490ff882c1fc7d9277df643fbce507fd7345ff, 0x6d32ffe94c3ffdc917fdebcbbfccd17ff52c5ff85f6fef77d97f85f67ef385bbfce166ff1549ffcb38e7f2d635fb5537feb345f78311fbcc7c5ffdf11fbdb243fe7db277df6c3fb83517ff294dffdf517ff58d55fd2fa6fed74befbed0fbd30c1fd85f07ff5345ff, 0xda71ffe35c9ff7d737ff20b39fc820feb55c3ffbed87be22c7ff79f176f32c5ffb673ffe9345f79591fbdd6c1ff2c917fdb0c1f96cb07fe90c1ff20f07f48acfffcb30e7e554dffbcd1fbf12c7ef5c90ffed647ef80917ff17c5ff78707ff5745ffb6317ff785dbf, 0x9727fc8849de8550ffdf2c9ffcc90ffed241df8a707f4c9cd7e94d07fb16c5f7acd27fe7645f775f5fff7bc7ef2090f782543fadf317fed341fe9dd1fbf38559fccb26fad6c7efdeb17ddd6d9fb6cd07f2964bbf2232779f349ffd490ffe554bff7a517def2c7ef,
-0x80717ff71c5ffc5d35bf1743eb32f35fb134bffc5927fed64dff9d51fff77c9ffcdf37ff38c9ffd5f2fff5849ffd730fff5341fdd0b0ffe35c7ffd8717f8a7c5ffc5f4fbc8de5ffb4b07f88089de2020feb4d5d5fde917def7c5ffcdd17ff4d4b5fb6117fdb2c1fc, 0xacb27fdd5c1fdc5b5ffe57c3ffbcd2ffcac4bbeda7277e0241fdd631ffe09cdffc678ffe0ac9ffc6b7fff5addffd716ffedae3ffbed47bf79cdffdeb27ff3acdffd6767ff5a4dffd6b2ffc91c3ffbdf4fbdd7c9ffb5f0ffe564dff34907f658dfff74717b971c3ff, 0xd4b07f615c7ff0b51ffc86d9ff9df6fddf4c5ff31f07f551c5feddf1fff38c7ffd611fff78593fc5535fdeadfdbb553ff63247ff74907f5f347ffd470ffed0c1fd6cf07f6774dffc670ffeb749ffc5b27fcb241fdb5b37fedac3ff9cd2ffe52c1fe9d927fe9349ff, 0x9d5277f6dc53fc6b6fdf5449ff32787fe564bff96307f6585fff3297ffcccdbff8afb7bdd1c1ef0971ffcd1c1fd8491ffdf2c7ff7c507ff31c3ffc8717fa9749ffbdb27fef649ffc5f07f75741fdb5b2ffed64bffb690ffed8c1fda4b27ff7241fdccd07f72c4d7f,
-0x9df07f76143ffad127dc88d1ff9553ff48449de94307f773457fdcb16fef7c1fdcdd07f6d841fdde777ff6945f7c6787ff1ac1fdbeb7fff1a5fff79f07673addffcf16fff32c1fdd6977ff5bdbffb698ffedae1ffded6fff79cbffde927ff3a4dffceb2fff5a4bff, 0xd490f7db141f70b31fff46c1fd9db07d635cd7f5cd0ffb75c3bf80707f60ac7ffdc707f73847ff8ad17ff7ac7ffbe97fff3a5dffcef6ffeda61ff6d317def54bbf7a97f6f58cd7fd5f377f58c9dfd630fef5343feb673f7ca7c1fdd67577e99d9f72ab7ffcad5bff, 0xc6907f612c9bf8490fecb243fe7cb277df2c3fbccb0eff3243dfcb3167e22237b888277ad757efb5f47fe5545f70b535fc2d49df0b50fee5841fdd6d77bf7a47ffc4d05f9d6c7ebccb2678b1c1fd9d91ffe33497f8c90fecd243fedb77cfdf349df7cd0fef53437f, 0xce3277f38c3fbccd0ffb584d7fd632dff584bbfd5f2f7f5849dfdf50dff5843fbd5b07ff5447ffb5107f72143ffd5717ff5c47efbcb06fa78d3ffa5127deb7d3ffd5b4ffc2243fbca517df7d637fdf586ff7d5fdfb5d27bcf345ff74d07ff10c1ffda527fefac1fd,
-0x5c917ff785ffbdf386ff7d617f64717fb1247efd633deed347ef6d55ff6fa41fdc5935fe74c3ff6d327fe3545ffd6375ff575fdfd4917fed64ffd9e307ff15c7efde126fe32c9fedc90ffb77cd7f85f37ef77cbbfddf277f77c3fbadf07ff38cd7fce136ff38cbbf, 0xb30feefb5fefced77be175ffb7d307f7385dbf82b35fcd2c1fcdcd05f772c1bdbd71fbf1ae37f84b27fa17cbfbce12eff3849dfce10fef7acd7fdeb2eff3447ff94d1fbdd243fe20917795143ff75f277dd7c3fbca317fc2df57f9c307ff6dc13d9593ff5b241ff, 0xbedafbe7853ffa5f4fff36d3ffc8217ff5cc5ffde935ff7a4bbf79347f5d0c1f974b07fef0c1ff8cd1dfe31c3fb3470ffab6d3f7d6b17deb74d7f75b37ef16cd7fc6b0dff16c3fb3c90ffc8c4fffacd2dfe934bbf9d9277c2545ff08b27fb384fbb0b32efc2cc9df, 0x95527ff60c1fd8251fbef247efb4b1fbf79c5f784b1efe11c3fbde51fbf3ac5f7d6917ded7c5ff74d07f2f64bbf8891ffe1545ffcc917fe7841ff20d07fa97c1ffcdb07fde441fd9cd17deb245f722317ff5955ff82d1fbeb6c1f7cf11fbf5bc7efded1fbf7847bf,
-0x5c717fe2941fd7d50fff26cdffcab0ffeb44d7795917df51c5ffbed07b5d2c1fcd1d17ff775bfbc6b85fe13c9ffc4d27fdf3cbffccf0fff42c5ff32d35fa2b41fdde765ff2cc19db5b17de52c7efa4917dc8845ffcb3ae7f3bc7efd5135ff5449df209077e2cc7ff, 0x83127fe0b4dff84d0feb784d3fde10eef73437edf127ff3c4dffd6f37ff5c4bffd6d67ff7b4dff3c70fff3a45f78cd0ded50c1fd9cd27fc8ac9de6d537feb543ff5c907f675cdffad727fefb69ef8cd0fea2b69ffd6737ff5ac9ff44b27fb344bbfcd1277cc2c9ff, 0xcf12fff5bcbffded2fff2081fdd351d7e1645ffcc717ff5cebffdf59ffed749cfb5d0fadd3c1fd32f7ffdf247ff33377fccb61ff82537fef349ffc4b27fed34bffb5927ff794dff6d52ffe9543ffd4907f59143ff7d71ffc2343fa21937ff20c1fddad277cc94d7e, 0x6d30feef2c9ff78d2fff57c7ffd4d15ff5245dfd070ffcab4bbe6cd07fb19dfffcc907f759ddffb678ffedadfffd6d6fff79c9ffce737ff3ac9ffd672fff5a49ffdd716fc8759ff28d27fc88c1fdc9d6ffe534bffc674fbe5649ff20907737bc9ff7b17f6f3bcdff,
-0x8b725fe2849fb88b27fa2ccbbf8b3277f5cc1fdb55277eb3457778507f61343ff0b70feb19dbf7b6b6fddb0c1fba6737dca94bbebe74fbe7749ff2298ffc8ae1ff2376ffdd6d5ffb5b27fed9c3ff9cb27fc8a49ded6567ff13476f20307f42541fdb5b5ffe13c7ff, 0xa571fff67c5ffd65577ca963ff5c90ff88841fd7d7277df5c3fb95f07f53349ff7af7f6f7d457fd211fff4a5dffd2f6fff5b55df24707f4ac5fff2b577fcab63ffb5f07f7794bffce567fd71c1fdcb796ff2d65dfad71ffcc961ff0a957ff37c7ffd6b1fff4741fd, 0xd691ffeda41fdd5f35ff58c97fd5f277f57c3fbd490ffb3955df64307f62205ffddf5eff58d77fd5f5f7e2dc77f8a11feef2c7afde10ffcb245feccb16ff3245dfd4707f5b2c1fede99fdf6747efc6707f4d241ffbe77fff39ddffb6787feda5fffced6ffedac1fd, 0xd9b17dd32c9ffc5f07ff3a47ffd4f17ff5741ffb6307fe17c9fb7cb27fb37cbbfce126ff37c9dfcdf0fef3243fed6b35ff5ac9df8db07f4c34b7f6d92ffe9643ff947179c864ffd7c90fed1343ff34717fad74fef8271ffcf245ffcc707f6f9c1fdde71fff3ac7ff,
-0xdc717fa50c1ffd6d1fbe0c4d7fccf17ff7c4d7fdf12efe77d3ff79f076f2747efd738dff5ce1bfdf57dff5cdfdfd617fef5341fcd212eff4843fb74907fed0c1ff2c907fdeac1fdacd25fe7349df6d53ff5e7d3dbd8507f5b0c1fd2c717fb13c7ef7555ff6b5cd7f, 0x28d2efe58c1ffc6b4dbf7bcd7fdef2eff6de73f9571fbe2dcb3fccd07f37d417dd4b07f1d547efdf5adfed247ef34707fc91c3fe7c91f7df1c3fbbcd2eff134b7f7d517fdea41fdb59277e92c9bf9cb277cd241fc9df07ff53417dd490776d5c7efbcf1fbe01c5fe, 0xdf5a5ff69c3ff2c707ff66c9ffbdf07ff3741ffd631dff57c7dfb6107fe09c9df2c907f31adf7f7cf27ff32c1bdcc90777575bfbb678f7f79cd7fde72eff79c9dfacb27fb3acd7fceb2eff3ac9dfd6935ff5a4bbfd69277e5247ef9c917ddb545f785b07f676c1f7, 0x85f1fef3847bfbed9fbe74c1fdbe97eff375bfbb67877f7b597f9cf37ff1743efacf27fe92c9fece92eff3a49dfcb3c67e2b67ffc6b6dde76d3f7c8507f75947efd6717de5841ffbe94ebe7749df75b27ee2201fdb5b277ed9c3dfb5b0fee5345f7c9b17dcf1c5ff,
-0xd2917df1ac17d3c907f48c49de75537ff1543ff7c90f6ed349ff82517dcd143ffde517df15c9ffb5737fc830d7e20c277b4bc7efccb07f35c49ffd6d37fe3345ffce51fbf39c5f754507f7274dffcb10fff79597f94b17df185defd9f07f73b47ef34707f0894fff, 0x9d50fff594dffd9b1fff5cf1ffdf5b7fdec45ffde317fcb1c1fc7cf1fff41c5ffbe906f5d54bffbd50ffed6cfffa4f27fe3243fa7cd0feb57cd5fd63257f58c37bd5f0f6f53437ed490f7a78d5ffadf57ff56d5ff20d2ffe5349ff7591fbe1345ffdc50ffe55cdff, 0xd652ffc2243fade117fc29d5ff3257fff2adbf774d07fab3c7ff75b1fbe12c9be8490fea17cbbb85f276df2c9dece1267f3c49ffce10eef3243de83597ff5bc9ffced37ff5b4bffded27ff7d65ff7d917fe3243ff7cd0ffc2d43fa23737feb6d5f733327fdb549ff, 0x8cd07f71751ef8e127fe17cdff8df2fff77c3ffce30fff5843ff7a57f6f5a67f79d71ffc2bd5ffbed07be52c9ffde17eef7d613fdf57d7f585fdb64507f655cbff74307ec8be3ff23187fc8dddff82527fc8bc9deb4b27fdb645f70b717ff7949ff7d507f7394dff,
-0x20841b9dcd05f372c1bc7af17fed247cf3c707f4ccc7ff,
-]
-
-def thirdBuckets : List ℕ := [
-0x20174a0586812c60482810c803f180f00000300d80000200c8802e100b0202b00000202a100a060251808820211007ca01a08064201800000401610051000c0802c40093000c6000, 0x102d080b0082bc20ae082b4e0a60829460a210280609d1826880961824c2092282358081101fc607c081ec4079081e02077081d84074281bc206e201a82069181984064101882061, 0x84202107184104102183fc80fb103e480f5203c460ee00000e0e71039500dd0837080d80835c40d51834840d00833c60cc1832460c61031040c20830420c0082fca0ba0000080b6, 0x8570615900000c15330534a14810518614308508c13c084ec6138104d84134204c0812c084ac81271849041221847c611c0846c211a0846461161844c411108440810c0842c4109,
-0x18740e1c9586f841bc186e4a1b4106c841b05069821a520684e19a08664000008660219748638c188386042180185f4617a000002179000004177305c5a1640858c216220578215d, 0x18840220f08838000008834e2060000022051880881fe207e821f9087e061f5087d081f0107b80000107b00000087ac41e9087a081e44077000001076821d91075c41d50875021d3, 0x209b4226c209a0a26318980625d18968225920954a25020930624920914424318900423e088f4223c108e88236288c4622e3889c22260000042240888c000028878221d088712213, 0x10b90c2de10b70c2d630b40a2cb10b2482c518b09e2b338ab022ab10aa462a620a89029a08a64429718a50c28e10a30628900000628610a10428208a042280289ec6278089dcc271,
-0x18d1c634410d08000000000434028cece33420cc0632d00000632a00000432810c98632368c58e30f20c2c630800000230730c04230000000c2fa18bdd42ed0000022ec20ba042e6, 0x10e8843a040e61039038e24000020e14438308e08438000000637d30dddc36910d9c000008d98636308d88436000000e35920d54235400000435208d44634e10d30434a, 0x28ff483f920fd4e3ee08fb4a3e808f9c00000000023e620f8843e028f6c43d918f58000008f5443d30000043d118f3863cb68ef843bc08eec83b708ed843b430eb863ab10ea4a3a4, 0x591ac4469091a0000051178245d09170645909161844c31118444400000c43e290e4c433000004431090c1242711094842121074641a21058841221038240d210248405090104402,
-0x1135904ce0933464ca2131844c419304c4bb112e444b7112d444b3092c8a4ad192a864a729288849e00000649b11264a4942923ca48a09224648611210a47f00000447d191e88476, 0x19504000009500253f794c105282948c00002147c851b4144ca50e09434000019428c504000000000114082501293f000000000064f9093e064f50000044f3093c9e4e34136c64d8, 0x1163c458d3161c45851160c258209604a57c115e82579195d86573095c80000115c00000095bc856b115a4456711594456311584455f0000000002156d055339530254b295184544, 0x317d445f3197c065ed097b065e93178c65e000000a5db6173c45cd0973065c909720c5c2216f865bb296d865b3296b865ab0000025aa41688859e116706599196580000296440000,
-0xe64800000464631900263f098f8c638000002637000002636000000000098d486315189cc62100000262011878461c11869261119838260d4181426041980445ff0000085fb, 0x11aa866a709a9866a311a85269809a5c469511a4c000021a3c668c19a24668611a10c67e000000000119f08678219d02673219bce6682199000000998c865f11975065529940264f, 0x9bb4000029ba046e621b8800000000046e021b7046da11b60000011b58000009b5466d219b3c66cc09b2c46c919b1886c209b04000011afc46bd39ad8c6b00000026af11ab426ac, 0x21d48475039d24274800001074041ce0273731cc5272811c98000011c90272309c89671711c54271409c4c671000000470e19c2c470949c0066fd11bec000021bdc26f609bd4e6ee,
-0x11ee867b721ecc47b100000a7ac39e94a7a009e7c279e19e6c879729e48000021e38478c21e20000011e18278519e08e77b19de0877409dcc277229db4000029da0676531d7d2756, 0x1a038680b0000068083200828010a00047fe11ff067f929fd0a7ef09fb867eb11fa447e711f9447e329f78c7d819f5487d111f3c47cd11f2c00000000067c811f18a7c111efc67bc, 0xa1a428682a18c48610a180e8591a15800000a154485312144884d1212c284a22118a8413a0e8a835220c4682e0a0b488291209c00002208c28221a07cc8190a06068151a0482811, 0x2a2fc28be0a2f428bc2a2dd08af322a428a81a29468a212280289f1a270000022261288f1a23000000a22c288a0a22468862a20400003a1e8a875121cc2872121c0286f0a1b8886a,
-0x2a4dc89332a4b929250000049231a480291f2246c291a0a464a9147a414a9000a3fc68fc3a3d400000a3d000003a3b528e42a37c48dd0000088d92235428d41a34400002a33108c4, 0x5a6bc69ac0a6ace9a42268000002267089980a65d298eca5d44973125c4297000000a96b2a59829652258549571a55029532253c494d0a530294b1252429480a51d093f1a4f00000, 0x1a8842a202a86c4a19000004a17128552a0c1a8248a051a8082a010a80029ff227ece9f42a7bc89eb0a7a8a9e52278449df2a76869d70000109cf3a72069c50a710a9bf126f469ba, 0x1aa14000022a042a80429e0ea712a9b04a6a1a99c8a63329744a5b32954aa502a92c8a47129142a441a9046a3e528d00000128c80000128c08a2c000002a2b1a8a00000128984a24,
-0x12b986ae32ab78aad90ab604ad61ab4c4ad1000002ad000000aacb5ab0000001aaf4aab80aadc8ab312ac42ab022ab02aab12aa46aa60aa944aa30aa884aa03aa644a9722a4d6a88, 0x42d3d4b451ad086b3f12cf48b3922cd46b3222cb8ab293ac88000012c806b1d12c6c8b174ac38000012c304b0a22c182b0522c042b003abe4eaf212bc0000032ba82ae90aba00000, 0x2ba50ae902ba3000006ba00ae7ceb980ae5c4b9512e4c6b90000006b8d000006b8a1ae1c2b860ae142b8412e08ab7d2ade10b7000000ab6b42d8c000012d844b5f1ad70ab57, 0xb0184c04130084c0042fe04bf6000004bf40afcc2bf2000008bee12fb08be81af94cbdf000002bde22f684bd87af242bc80af1c6bc41af046bbe1aeec2bba22ed88bb24aea46ba6,
-]
-
-def thirdCount : ℕ := 3079
-
 def decodeDeltas (fuel : ℕ) : ℕ → ℕ → List ℕ :=
   Nat.rec (motive := fun _ => ℕ → ℕ → List ℕ) (fun _ _ => [])
     (fun _ rest before data =>
@@ -7313,772 +8125,24 @@ def decodeDeltas (fuel : ℕ) : ℕ → ℕ → List ℕ :=
         let following := before + lead
         (following - 1) :: rest following (data >>> 8)) fuel
 
-def bucketMissing (count : ℕ) (atState : ℕ → SearchState)
-    (table : List ℕ) (z : ℕ) (v : List W) : Bool :=
-  st (z % 65521 % 1024) fun tag =>
-    st (((table.getD (tag / 32) 0) >>> (18 * (tag % 32))) % 262144) fun code =>
-      let a := code % 8192
-      let n := code / 8192
-      if a + n ≤ count then frontierMissing ((List.range' a n).map atState) z v else true
 
-lemma bucketMissing_found {count : ℕ} {atState : ℕ → SearchState} {table : List ℕ}
-    {z : ℕ} {v : List W} (h : bucketMissing count atState table z v = false) :
-    ∃ i < count, atState i = (z,v) := by
-  unfold bucketMissing at h
-  simp only [st_eq] at h
-  split at h
-  · rename_i ok
-    obtain ⟨i, hi, same⟩ := List.mem_map.mp (frontierMissing_false h)
-    exact ⟨i, lt_of_lt_of_le (List.mem_range'_1.mp hi).2 ok, same⟩
-  · contradiction
+noncomputable def openingContinuation (state : SearchState) : Bool :=
+  look1RawC rootReject I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1 state.1 state.2
 
+noncomputable def openingOrbitCoverage (i : ℕ) : Bool :=
+  pureSecond (firstAt i) (fun _ wires => !(lookupOrbit 2 wires).isSome)
 
--- A pure gate reads two original inputs. Store its operands and connective in seven bits.
-noncomputable def pureGate (id : ℕ) : W × ℕ :=
-  let code := (0xfcfbebdead7e3ce8d362cf6ef9b3d6af1a3f4eb932d4ab122b46bcb9e2c74a9c286c99a247c38e0c3428c082c18a042408 >>> (7*id)) % 128
-  let empty : W := ⟨0,0,0,0,3⟩
-  let a := rootPreparedWords.getD (code % 8) empty
-  let b := rootPreparedWords.getD ((code >>> 3) % 8) empty
-  (opW (code.testBit 6) a b, Nat.lor a.c b.c)
-
-def retainedInputs (inputs : List W) : ℕ → List W :=
-  List.rec (motive := fun _ => ℕ → List W) (fun _ => [])
-    (fun wire _ rest bits =>
-      let tail := rest (bits >>> 1)
-      if bits.testBit 0 then wire :: tail else tail) inputs
-
--- Each entry contains the retained input mask and the three gates that produced the other wires.
-noncomputable def thirdAt (i : ℕ) : SearchState :=
-  let block := thirdEncodedStocks.getD (i / 32) 0
-  let entry := (block >>> (26 * (i % 32))) % 67108864
-  let raw := retainedInputs rootPreparedWords entry
-  let a := pureGate ((entry >>> 8) % 64)
-  let b := pureGate ((entry >>> 14) % 64)
-  let c := pureGate ((entry >>> 20) % 64)
-  let stock := addS a.1 (addS b.1 (addS c.1 raw))
-  let paid := Nat.add a.2 (Nat.add b.2 c.2)
-  -- The budget depends on the retained wires, independently of their order.
-  (rootPreparedBudget - (paid + sumc (a.1 :: b.1 :: c.1 :: raw)), stock)
-
-noncomputable def mixedFromSecond (state : SearchState) : Bool :=
-  frc state.2 (fun v => st state.1 (fun z =>
-    mvRawC I.NN I.AA I.HX I.HY true
-      (lookRawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14)
-      I.AA rootPreparedMask rootPreparedSlots 12 1 z v 0))
-
-noncomputable def afterThird (state : SearchState) : Bool :=
-  frc state.2 (fun v => st state.1 (fun z =>
-    look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 12 11 1 z v))
-
-lemma afterSecond_false (state : SearchState)
-    (two : 1 < state.2.length) (small : state.2.length < 11)
-    (mixed : mixedFromSecond state = false)
-    (pure : pureAt 11 state (fun z v => afterThird (z,v)) = false) :
-    afterSecond state = false := by
-  have lengthOkay : Nat.ble state.2.length 1 = false := by
-    cases h : Nat.ble state.2.length 1
-    · rfl
-    · exact absurd (Nat.le_of_ble_eq_true h) (Nat.not_le_of_gt two)
-  have choose0 (F : ℕ → Bool) : tstC I.NN I.AA I.HX I.HY true I.AA 12 state.2 F = F 0 := by
-    have h0 : Nat.beq state.2.length 12 = false := beq_f (by omega)
-    have h1 : Nat.beq state.2.length.succ 12 = false := beq_f (by omega)
-    simp only [tstC, bR, h0, h1, Bool.cond_false]
-  rw [afterSecond, frc_eq, st_eq, show (13 : ℕ) = Nat.succ 12 from rfl, look1RawC_step,
-    lengthOkay, Bool.cond_false]
-  change tstC I.NN I.AA I.HX I.HY true I.AA 12 state.2 _ = _
-  rw [choose0]
-  simp only [afterThird, frc_eq, st_eq] at pure
-  simp only [mixedFromSecond, frc_eq, st_eq] at mixed
-  change (bif pureAt 11 state
-      (look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 12 11 1)
-    then true else _) = _
-  rw [pure, mixed]
-  rfl
-
-noncomputable def readyForThird (i : ℕ) : Bool :=
-  let state := secondAt i
-  (!pureAt 11 state (bucketMissing thirdCount thirdAt thirdBuckets)) &&
-    (decide (1 < state.2.length) && decide (state.2.length < 11))
-
-noncomputable def thirdTest (j : ℕ) : Bool := !afterThird (thirdAt j)
-noncomputable def secondMixedTest (j : ℕ) : Bool := !mixedFromSecond (secondAt j)
-
-lemma checkedAfterSecond (i : ℕ) (hi : i < secondCount)
-    (ready : rangeCheck readyForThird 0 secondCount = true)
-    (mixed : rangeCheck secondMixedTest 0 secondCount = true)
-    (third : rangeCheck thirdTest 0 thirdCount = true) :
-    afterSecond (secondAt i) = false := by
-  have h := rangeCheck_at ready hi
-  simp only [readyForThird, Bool.and_eq_true, decide_eq_true_eq] at h
-  obtain ⟨hc, htwo, hsmall⟩ := h
-  refine afterSecond_false (secondAt i) htwo hsmall (boolOfNeg (rangeCheck_at mixed hi)) ?_
-  refine pureAt_of_covered 11 (secondAt i) afterThird
-    (bucketMissing thirdCount thirdAt thirdBuckets) (boolOfNeg hc) ?_
-  intro z words found
-  obtain ⟨j, hj, eq⟩ := bucketMissing_found found
-  rw [← eq]
-  exact boolOfNeg (rangeCheck_at third hj)
-
-lemma checkedSecondGroups
-    (ready : rangeCheck readyForThird 0 secondCount = true)
-    (mixed : rangeCheck secondMixedTest 0 secondCount = true)
-    (third : rangeCheck thirdTest 0 thirdCount = true) :
-    secondGroups.all groupChecked = true := by
-  apply List.all_eq_true.mpr
-  intro group member
-  obtain ⟨block, _, rfl⟩ := List.mem_map.mp member
-  apply List.all_eq_true.mpr
-  intro state found
-  obtain ⟨i, hi, rfl⟩ := List.mem_map.mp found
-  have hb := List.mem_range.mp hi
-  have bound : 4*block+i < secondCount := by omega
-  simp only [checkedAfterSecond _ bound ready mixed third, Bool.not_false]
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem coverageChunk0 : rangeCheck readyForThird 0 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem coverageChunk1 : rangeCheck readyForThird 16 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem coverageChunk2 : rangeCheck readyForThird 32 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem coverageChunk3 : rangeCheck readyForThird 48 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem coverageChunk4 : rangeCheck readyForThird 64 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem coverageChunk5 : rangeCheck readyForThird 80 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem coverageChunk6 : rangeCheck readyForThird 96 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem coverageChunk7 : rangeCheck readyForThird 112 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem coverageChunk8 : rangeCheck readyForThird 128 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem coverageChunk9 : rangeCheck readyForThird 144 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem coverageChunk10 : rangeCheck readyForThird 160 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem coverageChunk11 : rangeCheck readyForThird 176 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem coverageChunk12 : rangeCheck readyForThird 192 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem coverageChunk13 : rangeCheck readyForThird 208 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem coverageChunk14 : rangeCheck readyForThird 224 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem coverageChunk15 : rangeCheck readyForThird 240 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem coverageChunk16 : rangeCheck readyForThird 256 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem coverageChunk17 : rangeCheck readyForThird 272 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem coverageChunk18 : rangeCheck readyForThird 288 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem coverageChunk19 : rangeCheck readyForThird 304 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem coverageChunk20 : rangeCheck readyForThird 320 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem coverageChunk21 : rangeCheck readyForThird 336 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem coverageChunk22 : rangeCheck readyForThird 352 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem coverageChunk23 : rangeCheck readyForThird 368 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem coverageChunk24 : rangeCheck readyForThird 384 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem coverageChunk25 : rangeCheck readyForThird 400 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem coverageChunk26 : rangeCheck readyForThird 416 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem coverageChunk27 : rangeCheck readyForThird 432 11 = true := by decide +kernel
-
-abbrev appendCoverage := @rangeAppend readyForThird
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem coverageChunkAll : rangeCheck readyForThird 0 secondCount = true := by
-  exact (@appendCoverage 0 224 219
-    (@appendCoverage 0 112 112
-     (@appendCoverage 0 48 64
-      (@appendCoverage 0 16 32
-       coverageChunk0
-       (@appendCoverage 16 16 16
-        coverageChunk1
-        coverageChunk2))
-      (@appendCoverage 48 32 32
-       (@appendCoverage 48 16 16
-        coverageChunk3
-        coverageChunk4)
-       (@appendCoverage 80 16 16
-        coverageChunk5
-        coverageChunk6)))
-     (@appendCoverage 112 48 64
-      (@appendCoverage 112 16 32
-       coverageChunk7
-       (@appendCoverage 128 16 16
-        coverageChunk8
-        coverageChunk9))
-      (@appendCoverage 160 32 32
-       (@appendCoverage 160 16 16
-        coverageChunk10
-        coverageChunk11)
-       (@appendCoverage 192 16 16
-        coverageChunk12
-        coverageChunk13))))
-    (@appendCoverage 224 112 107
-     (@appendCoverage 224 48 64
-      (@appendCoverage 224 16 32
-       coverageChunk14
-       (@appendCoverage 240 16 16
-        coverageChunk15
-        coverageChunk16))
-      (@appendCoverage 272 32 32
-       (@appendCoverage 272 16 16
-        coverageChunk17
-        coverageChunk18)
-       (@appendCoverage 304 16 16
-        coverageChunk19
-        coverageChunk20)))
-     (@appendCoverage 336 48 59
-      (@appendCoverage 336 16 32
-       coverageChunk21
-       (@appendCoverage 352 16 16
-        coverageChunk22
-        coverageChunk23))
-      (@appendCoverage 384 32 27
-       (@appendCoverage 384 16 16
-        coverageChunk24
-        coverageChunk25)
-       (@appendCoverage 416 16 11
-        coverageChunk26
-        coverageChunk27)))))
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk0 : rangeCheck secondMixedTest 0 7 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk1 : rangeCheck secondMixedTest 7 11 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk2 : rangeCheck secondMixedTest 18 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk3 : rangeCheck secondMixedTest 34 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk4 : rangeCheck secondMixedTest 50 6 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk5 : rangeCheck secondMixedTest 56 13 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk6 : rangeCheck secondMixedTest 69 12 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk7 : rangeCheck secondMixedTest 81 7 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk8 : rangeCheck secondMixedTest 88 9 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk9 : rangeCheck secondMixedTest 97 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk10 : rangeCheck secondMixedTest 113 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk11 : rangeCheck secondMixedTest 129 9 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk12 : rangeCheck secondMixedTest 138 9 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk13 : rangeCheck secondMixedTest 147 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk14 : rangeCheck secondMixedTest 163 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk15 : rangeCheck secondMixedTest 179 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk16 : rangeCheck secondMixedTest 195 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk17 : rangeCheck secondMixedTest 211 12 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk18 : rangeCheck secondMixedTest 223 4 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk19 : rangeCheck secondMixedTest 227 10 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk20 : rangeCheck secondMixedTest 237 7 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk21 : rangeCheck secondMixedTest 244 6 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk22 : rangeCheck secondMixedTest 250 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk23 : rangeCheck secondMixedTest 266 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk24 : rangeCheck secondMixedTest 282 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk25 : rangeCheck secondMixedTest 298 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk26 : rangeCheck secondMixedTest 314 12 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk27 : rangeCheck secondMixedTest 326 15 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk28 : rangeCheck secondMixedTest 341 6 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk29 : rangeCheck secondMixedTest 347 6 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk30 : rangeCheck secondMixedTest 353 7 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk31 : rangeCheck secondMixedTest 360 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk32 : rangeCheck secondMixedTest 376 14 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk33 : rangeCheck secondMixedTest 390 4 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk34 : rangeCheck secondMixedTest 394 13 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk35 : rangeCheck secondMixedTest 407 16 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk36 : rangeCheck secondMixedTest 423 9 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk37 : rangeCheck secondMixedTest 432 7 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunk38 : rangeCheck secondMixedTest 439 4 = true := by decide +kernel
-
-abbrev appendMixed := @rangeAppend secondMixedTest
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem mixedChunkAll : rangeCheck secondMixedTest 0 secondCount = true := by
-  exact (@appendMixed 0 227 216
-    (@appendMixed 0 97 130
-     (@appendMixed 0 50 47
-      (@appendMixed 0 18 32
-       (@appendMixed 0 7 11
-        mixedChunk0
-        mixedChunk1)
-       (@appendMixed 18 16 16
-        mixedChunk2
-        mixedChunk3))
-      (@appendMixed 50 19 28
-       (@appendMixed 50 6 13
-        mixedChunk4
-        mixedChunk5)
-       (@appendMixed 69 12 16
-        mixedChunk6
-        (@appendMixed 81 7 9
-         mixedChunk7
-         mixedChunk8))))
-     (@appendMixed 97 66 64
-      (@appendMixed 97 32 34
-       (@appendMixed 97 16 16
-        mixedChunk9
-        mixedChunk10)
-       (@appendMixed 129 9 25
-        mixedChunk11
-        (@appendMixed 138 9 16
-         mixedChunk12
-         mixedChunk13)))
-      (@appendMixed 163 32 32
-       (@appendMixed 163 16 16
-        mixedChunk14
-        mixedChunk15)
-       (@appendMixed 195 16 16
-        mixedChunk16
-        (@appendMixed 211 12 4
-         mixedChunk17
-         mixedChunk18)))))
-    (@appendMixed 227 120 96
-     (@appendMixed 227 55 65
-      (@appendMixed 227 17 38
-       (@appendMixed 227 10 7
-        mixedChunk19
-        mixedChunk20)
-       (@appendMixed 244 6 32
-        mixedChunk21
-        (@appendMixed 250 16 16
-         mixedChunk22
-         mixedChunk23)))
-      (@appendMixed 282 32 33
-       (@appendMixed 282 16 16
-        mixedChunk24
-        mixedChunk25)
-       (@appendMixed 314 12 21
-        mixedChunk26
-        (@appendMixed 326 15 6
-         mixedChunk27
-         mixedChunk28))))
-     (@appendMixed 347 47 49
-      (@appendMixed 347 13 34
-       (@appendMixed 347 6 7
-        mixedChunk29
-        mixedChunk30)
-       (@appendMixed 360 16 18
-        mixedChunk31
-        (@appendMixed 376 14 4
-         mixedChunk32
-         mixedChunk33)))
-      (@appendMixed 394 29 20
-       (@appendMixed 394 13 16
-        mixedChunk34
-        mixedChunk35)
-       (@appendMixed 423 9 11
-        mixedChunk36
-        (@appendMixed 432 7 4
-         mixedChunk37
-         mixedChunk38))))))
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk0 : rangeCheck thirdTest 0 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk1 : rangeCheck thirdTest 62 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk2 : rangeCheck thirdTest 124 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk3 : rangeCheck thirdTest 186 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk4 : rangeCheck thirdTest 248 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk5 : rangeCheck thirdTest 310 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk6 : rangeCheck thirdTest 372 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk7 : rangeCheck thirdTest 434 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk8 : rangeCheck thirdTest 496 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk9 : rangeCheck thirdTest 558 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk10 : rangeCheck thirdTest 620 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk11 : rangeCheck thirdTest 682 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk12 : rangeCheck thirdTest 744 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk13 : rangeCheck thirdTest 806 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk14 : rangeCheck thirdTest 868 55 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk15 : rangeCheck thirdTest 923 43 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk16 : rangeCheck thirdTest 966 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk17 : rangeCheck thirdTest 1028 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk18 : rangeCheck thirdTest 1090 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk19 : rangeCheck thirdTest 1152 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk20 : rangeCheck thirdTest 1214 41 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk21 : rangeCheck thirdTest 1255 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk22 : rangeCheck thirdTest 1317 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk23 : rangeCheck thirdTest 1379 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk24 : rangeCheck thirdTest 1441 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk25 : rangeCheck thirdTest 1503 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk26 : rangeCheck thirdTest 1565 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk27 : rangeCheck thirdTest 1627 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk28 : rangeCheck thirdTest 1689 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk29 : rangeCheck thirdTest 1751 30 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk30 : rangeCheck thirdTest 1781 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk31 : rangeCheck thirdTest 1843 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk32 : rangeCheck thirdTest 1905 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk33 : rangeCheck thirdTest 1967 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk34 : rangeCheck thirdTest 2029 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk35 : rangeCheck thirdTest 2091 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk36 : rangeCheck thirdTest 2153 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk37 : rangeCheck thirdTest 2215 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk38 : rangeCheck thirdTest 2277 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk39 : rangeCheck thirdTest 2339 51 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk40 : rangeCheck thirdTest 2390 47 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk41 : rangeCheck thirdTest 2437 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk42 : rangeCheck thirdTest 2499 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk43 : rangeCheck thirdTest 2561 59 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk44 : rangeCheck thirdTest 2620 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk45 : rangeCheck thirdTest 2682 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk46 : rangeCheck thirdTest 2744 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk47 : rangeCheck thirdTest 2806 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk48 : rangeCheck thirdTest 2868 45 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk49 : rangeCheck thirdTest 2913 62 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk50 : rangeCheck thirdTest 2975 48 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk51 : rangeCheck thirdTest 3023 33 = true := by decide +kernel
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunk52 : rangeCheck thirdTest 3056 23 = true := by decide +kernel
-
-abbrev thirdChunkAppend := @rangeAppend thirdTest
-
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem thirdChunkAll : rangeCheck thirdTest 0 3079 = true :=
-  (@thirdChunkAppend 0 1565 1514 (@thirdChunkAppend 0 806 759 (@thirdChunkAppend 0 372 434 (@thirdChunkAppend 0 186 186 (@thirdChunkAppend 0 62 124 thirdChunk0 (@thirdChunkAppend 62 62 62 thirdChunk1 thirdChunk2)) (@thirdChunkAppend 186 62 124 thirdChunk3 (@thirdChunkAppend 248 62 62 thirdChunk4 thirdChunk5))) (@thirdChunkAppend 372 186 248 (@thirdChunkAppend 372 62 124 thirdChunk6 (@thirdChunkAppend 434 62 62 thirdChunk7 thirdChunk8)) (@thirdChunkAppend 558 124 124 (@thirdChunkAppend 558 62 62 thirdChunk9 thirdChunk10) (@thirdChunkAppend 682 62 62 thirdChunk11 thirdChunk12)))) (@thirdChunkAppend 806 346 413 (@thirdChunkAppend 806 160 186 (@thirdChunkAppend 806 62 98 thirdChunk13 (@thirdChunkAppend 868 55 43 thirdChunk14 thirdChunk15)) (@thirdChunkAppend 966 62 124 thirdChunk16 (@thirdChunkAppend 1028 62 62 thirdChunk17 thirdChunk18))) (@thirdChunkAppend 1152 165 248 (@thirdChunkAppend 1152 62 103 thirdChunk19 (@thirdChunkAppend 1214 41 62 thirdChunk20 thirdChunk21)) (@thirdChunkAppend 1317 124 124 (@thirdChunkAppend 1317 62 62 thirdChunk22 thirdChunk23) (@thirdChunkAppend 1441 62 62 thirdChunk24 thirdChunk25))))) (@thirdChunkAppend 1565 774 740 (@thirdChunkAppend 1565 340 434 (@thirdChunkAppend 1565 186 154 (@thirdChunkAppend 1565 62 124 thirdChunk26 (@thirdChunkAppend 1627 62 62 thirdChunk27 thirdChunk28)) (@thirdChunkAppend 1751 30 124 thirdChunk29 (@thirdChunkAppend 1781 62 62 thirdChunk30 thirdChunk31))) (@thirdChunkAppend 1905 186 248 (@thirdChunkAppend 1905 62 124 thirdChunk32 (@thirdChunkAppend 1967 62 62 thirdChunk33 thirdChunk34)) (@thirdChunkAppend 2091 124 124 (@thirdChunkAppend 2091 62 62 thirdChunk35 thirdChunk36) (@thirdChunkAppend 2215 62 62 thirdChunk37 thirdChunk38)))) (@thirdChunkAppend 2339 405 335 (@thirdChunkAppend 2339 160 245 (@thirdChunkAppend 2339 51 109 thirdChunk39 (@thirdChunkAppend 2390 47 62 thirdChunk40 thirdChunk41)) (@thirdChunkAppend 2499 121 124 (@thirdChunkAppend 2499 62 59 thirdChunk42 thirdChunk43) (@thirdChunkAppend 2620 62 62 thirdChunk44 thirdChunk45))) (@thirdChunkAppend 2744 169 166 (@thirdChunkAppend 2744 62 107 thirdChunk46 (@thirdChunkAppend 2806 62 45 thirdChunk47 thirdChunk48)) (@thirdChunkAppend 2913 110 56 (@thirdChunkAppend 2913 62 48 thirdChunk49 thirdChunk50) (@thirdChunkAppend 3023 33 23 thirdChunk51 thirdChunk52))))))
-
-theorem completeSecondTable : secondGroups.all groupChecked = true :=
-  checkedSecondGroups coverageChunkAll mixedChunkAll thirdChunkAll
-
-noncomputable def firstContinuation (state : SearchState) : Bool :=
-  look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1 state.1 state.2
-
-lemma certifyFirst (i : ℕ) (ids : List ℕ)
+lemma finishOpeningByOrbit (i : ℕ)
     (two : 1 < (firstAt i).2.length) (small : (firstAt i).2.length < 12)
     (mixed : mixedSecond (firstAt i) = false)
-    (complete : pureSecond (firstAt i) (frontierMissing (ids.map secondAt)) = false)
-    (valid : ids.all indexValid = true) : firstContinuation (firstAt i) = false :=
-  afterFirst_false (firstAt i) two small mixed
-    (pureSecond_from_frontier (firstAt i) (ids.map secondAt) complete
-      (checkIndexTable completeSecondTable valid))
+    (complete : openingOrbitCoverage i = false) : openingContinuation (firstAt i) = false := by
+  refine afterFirst_false (firstAt i) two small mixed ?_
+  refine pureAt_of_covered 12 (firstAt i) afterSecond (fun _ wires => !(lookupOrbit 2 wires).isSome) complete ?_
+  intro z wires found
+  have certified : (lookupOrbit 2 wires).isSome = true := by simpa using found
+  have rejected : rootReject 12 1 z wires = true := by simp [rootReject, rejectOrbit, certified]
+  simp only [afterSecond, frc_eq, st_eq, show (13 : ℕ) = Nat.succ 12 from rfl,
+    look1RawC_step, rejected, Bool.cond_true]
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8086,9 +8150,11 @@ theorem first0_mixed : mixedSecond (firstAt 0) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first0_checked : firstContinuation (firstAt 0) = false :=
-  certifyFirst 0 successors0 (by decide +kernel) (by decide +kernel)
-    first0_mixed successors0_complete (by decide +kernel)
+theorem first0_covered : openingOrbitCoverage 0 = false := by decide +kernel
+
+set_option maxRecDepth 100000 in
+theorem first0_checked : openingContinuation (firstAt 0) = false :=
+  finishOpeningByOrbit 0 (by decide +kernel) (by decide +kernel) first0_mixed first0_covered
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8096,9 +8162,11 @@ theorem first1_mixed : mixedSecond (firstAt 1) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first1_checked : firstContinuation (firstAt 1) = false :=
-  certifyFirst 1 successors1 (by decide +kernel) (by decide +kernel)
-    first1_mixed successors1_complete (by decide +kernel)
+theorem first1_covered : openingOrbitCoverage 1 = false := by decide +kernel
+
+set_option maxRecDepth 100000 in
+theorem first1_checked : openingContinuation (firstAt 1) = false :=
+  finishOpeningByOrbit 1 (by decide +kernel) (by decide +kernel) first1_mixed first1_covered
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8106,9 +8174,11 @@ theorem first2_mixed : mixedSecond (firstAt 2) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first2_checked : firstContinuation (firstAt 2) = false :=
-  certifyFirst 2 successors2 (by decide +kernel) (by decide +kernel)
-    first2_mixed successors2_complete (by decide +kernel)
+theorem first2_covered : openingOrbitCoverage 2 = false := by decide +kernel
+
+set_option maxRecDepth 100000 in
+theorem first2_checked : openingContinuation (firstAt 2) = false :=
+  finishOpeningByOrbit 2 (by decide +kernel) (by decide +kernel) first2_mixed first2_covered
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8116,9 +8186,11 @@ theorem first3_mixed : mixedSecond (firstAt 3) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first3_checked : firstContinuation (firstAt 3) = false :=
-  certifyFirst 3 successors3 (by decide +kernel) (by decide +kernel)
-    first3_mixed successors3_complete (by decide +kernel)
+theorem first3_covered : openingOrbitCoverage 3 = false := by decide +kernel
+
+set_option maxRecDepth 100000 in
+theorem first3_checked : openingContinuation (firstAt 3) = false :=
+  finishOpeningByOrbit 3 (by decide +kernel) (by decide +kernel) first3_mixed first3_covered
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8126,9 +8198,11 @@ theorem first4_mixed : mixedSecond (firstAt 4) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first4_checked : firstContinuation (firstAt 4) = false :=
-  certifyFirst 4 successors4 (by decide +kernel) (by decide +kernel)
-    first4_mixed successors4_complete (by decide +kernel)
+theorem first4_covered : openingOrbitCoverage 4 = false := by decide +kernel
+
+set_option maxRecDepth 100000 in
+theorem first4_checked : openingContinuation (firstAt 4) = false :=
+  finishOpeningByOrbit 4 (by decide +kernel) (by decide +kernel) first4_mixed first4_covered
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8136,9 +8210,11 @@ theorem first5_mixed : mixedSecond (firstAt 5) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first5_checked : firstContinuation (firstAt 5) = false :=
-  certifyFirst 5 successors5 (by decide +kernel) (by decide +kernel)
-    first5_mixed successors5_complete (by decide +kernel)
+theorem first5_covered : openingOrbitCoverage 5 = false := by decide +kernel
+
+set_option maxRecDepth 100000 in
+theorem first5_checked : openingContinuation (firstAt 5) = false :=
+  finishOpeningByOrbit 5 (by decide +kernel) (by decide +kernel) first5_mixed first5_covered
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8146,9 +8222,11 @@ theorem first6_mixed : mixedSecond (firstAt 6) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first6_checked : firstContinuation (firstAt 6) = false :=
-  certifyFirst 6 successors6 (by decide +kernel) (by decide +kernel)
-    first6_mixed successors6_complete (by decide +kernel)
+theorem first6_covered : openingOrbitCoverage 6 = false := by decide +kernel
+
+set_option maxRecDepth 100000 in
+theorem first6_checked : openingContinuation (firstAt 6) = false :=
+  finishOpeningByOrbit 6 (by decide +kernel) (by decide +kernel) first6_mixed first6_covered
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8156,9 +8234,11 @@ theorem first7_mixed : mixedSecond (firstAt 7) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first7_checked : firstContinuation (firstAt 7) = false :=
-  certifyFirst 7 successors7 (by decide +kernel) (by decide +kernel)
-    first7_mixed successors7_complete (by decide +kernel)
+theorem first7_covered : openingOrbitCoverage 7 = false := by decide +kernel
+
+set_option maxRecDepth 100000 in
+theorem first7_checked : openingContinuation (firstAt 7) = false :=
+  finishOpeningByOrbit 7 (by decide +kernel) (by decide +kernel) first7_mixed first7_covered
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8166,9 +8246,11 @@ theorem first8_mixed : mixedSecond (firstAt 8) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first8_checked : firstContinuation (firstAt 8) = false :=
-  certifyFirst 8 successors8 (by decide +kernel) (by decide +kernel)
-    first8_mixed successors8_complete (by decide +kernel)
+theorem first8_covered : openingOrbitCoverage 8 = false := by decide +kernel
+
+set_option maxRecDepth 100000 in
+theorem first8_checked : openingContinuation (firstAt 8) = false :=
+  finishOpeningByOrbit 8 (by decide +kernel) (by decide +kernel) first8_mixed first8_covered
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8176,9 +8258,11 @@ theorem first9_mixed : mixedSecond (firstAt 9) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first9_checked : firstContinuation (firstAt 9) = false :=
-  certifyFirst 9 successors9 (by decide +kernel) (by decide +kernel)
-    first9_mixed successors9_complete (by decide +kernel)
+theorem first9_covered : openingOrbitCoverage 9 = false := by decide +kernel
+
+set_option maxRecDepth 100000 in
+theorem first9_checked : openingContinuation (firstAt 9) = false :=
+  finishOpeningByOrbit 9 (by decide +kernel) (by decide +kernel) first9_mixed first9_covered
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8186,9 +8270,11 @@ theorem first10_mixed : mixedSecond (firstAt 10) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first10_checked : firstContinuation (firstAt 10) = false :=
-  certifyFirst 10 successors10 (by decide +kernel) (by decide +kernel)
-    first10_mixed successors10_complete (by decide +kernel)
+theorem first10_covered : openingOrbitCoverage 10 = false := by decide +kernel
+
+set_option maxRecDepth 100000 in
+theorem first10_checked : openingContinuation (firstAt 10) = false :=
+  finishOpeningByOrbit 10 (by decide +kernel) (by decide +kernel) first10_mixed first10_covered
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8196,9 +8282,11 @@ theorem first11_mixed : mixedSecond (firstAt 11) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first11_checked : firstContinuation (firstAt 11) = false :=
-  certifyFirst 11 successors11 (by decide +kernel) (by decide +kernel)
-    first11_mixed successors11_complete (by decide +kernel)
+theorem first11_covered : openingOrbitCoverage 11 = false := by decide +kernel
+
+set_option maxRecDepth 100000 in
+theorem first11_checked : openingContinuation (firstAt 11) = false :=
+  finishOpeningByOrbit 11 (by decide +kernel) (by decide +kernel) first11_mixed first11_covered
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8206,9 +8294,11 @@ theorem first12_mixed : mixedSecond (firstAt 12) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first12_checked : firstContinuation (firstAt 12) = false :=
-  certifyFirst 12 successors12 (by decide +kernel) (by decide +kernel)
-    first12_mixed successors12_complete (by decide +kernel)
+theorem first12_covered : openingOrbitCoverage 12 = false := by decide +kernel
+
+set_option maxRecDepth 100000 in
+theorem first12_checked : openingContinuation (firstAt 12) = false :=
+  finishOpeningByOrbit 12 (by decide +kernel) (by decide +kernel) first12_mixed first12_covered
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8216,9 +8306,11 @@ theorem first13_mixed : mixedSecond (firstAt 13) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first13_checked : firstContinuation (firstAt 13) = false :=
-  certifyFirst 13 successors13 (by decide +kernel) (by decide +kernel)
-    first13_mixed successors13_complete (by decide +kernel)
+theorem first13_covered : openingOrbitCoverage 13 = false := by decide +kernel
+
+set_option maxRecDepth 100000 in
+theorem first13_checked : openingContinuation (firstAt 13) = false :=
+  finishOpeningByOrbit 13 (by decide +kernel) (by decide +kernel) first13_mixed first13_covered
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8226,9 +8318,11 @@ theorem first14_mixed : mixedSecond (firstAt 14) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first14_checked : firstContinuation (firstAt 14) = false :=
-  certifyFirst 14 successors14 (by decide +kernel) (by decide +kernel)
-    first14_mixed successors14_complete (by decide +kernel)
+theorem first14_covered : openingOrbitCoverage 14 = false := by decide +kernel
+
+set_option maxRecDepth 100000 in
+theorem first14_checked : openingContinuation (firstAt 14) = false :=
+  finishOpeningByOrbit 14 (by decide +kernel) (by decide +kernel) first14_mixed first14_covered
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8236,9 +8330,11 @@ theorem first15_mixed : mixedSecond (firstAt 15) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first15_checked : firstContinuation (firstAt 15) = false :=
-  certifyFirst 15 successors15 (by decide +kernel) (by decide +kernel)
-    first15_mixed successors15_complete (by decide +kernel)
+theorem first15_covered : openingOrbitCoverage 15 = false := by decide +kernel
+
+set_option maxRecDepth 100000 in
+theorem first15_checked : openingContinuation (firstAt 15) = false :=
+  finishOpeningByOrbit 15 (by decide +kernel) (by decide +kernel) first15_mixed first15_covered
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8246,9 +8342,11 @@ theorem first16_mixed : mixedSecond (firstAt 16) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first16_checked : firstContinuation (firstAt 16) = false :=
-  certifyFirst 16 successors16 (by decide +kernel) (by decide +kernel)
-    first16_mixed successors16_complete (by decide +kernel)
+theorem first16_covered : openingOrbitCoverage 16 = false := by decide +kernel
+
+set_option maxRecDepth 100000 in
+theorem first16_checked : openingContinuation (firstAt 16) = false :=
+  finishOpeningByOrbit 16 (by decide +kernel) (by decide +kernel) first16_mixed first16_covered
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8256,9 +8354,11 @@ theorem first17_mixed : mixedSecond (firstAt 17) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first17_checked : firstContinuation (firstAt 17) = false :=
-  certifyFirst 17 successors17 (by decide +kernel) (by decide +kernel)
-    first17_mixed successors17_complete (by decide +kernel)
+theorem first17_covered : openingOrbitCoverage 17 = false := by decide +kernel
+
+set_option maxRecDepth 100000 in
+theorem first17_checked : openingContinuation (firstAt 17) = false :=
+  finishOpeningByOrbit 17 (by decide +kernel) (by decide +kernel) first17_mixed first17_covered
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8266,9 +8366,11 @@ theorem first18_mixed : mixedSecond (firstAt 18) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first18_checked : firstContinuation (firstAt 18) = false :=
-  certifyFirst 18 successors18 (by decide +kernel) (by decide +kernel)
-    first18_mixed successors18_complete (by decide +kernel)
+theorem first18_covered : openingOrbitCoverage 18 = false := by decide +kernel
+
+set_option maxRecDepth 100000 in
+theorem first18_checked : openingContinuation (firstAt 18) = false :=
+  finishOpeningByOrbit 18 (by decide +kernel) (by decide +kernel) first18_mixed first18_covered
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8276,9 +8378,11 @@ theorem first19_mixed : mixedSecond (firstAt 19) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first19_checked : firstContinuation (firstAt 19) = false :=
-  certifyFirst 19 successors19 (by decide +kernel) (by decide +kernel)
-    first19_mixed successors19_complete (by decide +kernel)
+theorem first19_covered : openingOrbitCoverage 19 = false := by decide +kernel
+
+set_option maxRecDepth 100000 in
+theorem first19_checked : openingContinuation (firstAt 19) = false :=
+  finishOpeningByOrbit 19 (by decide +kernel) (by decide +kernel) first19_mixed first19_covered
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8286,27 +8390,32 @@ theorem first20_mixed : mixedSecond (firstAt 20) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first20_checked : firstContinuation (firstAt 20) = false :=
-  certifyFirst 20 successors20 (by decide +kernel) (by decide +kernel)
-    first20_mixed successors20_complete (by decide +kernel)
+theorem first20_covered : openingOrbitCoverage 20 = false := by decide +kernel
+
+set_option maxRecDepth 100000 in
+theorem first20_checked : openingContinuation (firstAt 20) = false :=
+  finishOpeningByOrbit 20 (by decide +kernel) (by decide +kernel) first20_mixed first20_covered
+
+noncomputable abbrev rootPairCheck (hash : ℕ) (kind : Bool) := chkPairPicked rootReject [] rootBounds 0 14 1 hash 0 kind
+noncomputable abbrev rootCircuitCheck (hash : ℕ) := chkRaw rootReject [] rootBounds 0 14 1 hash 0
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem caseBinary_0_and : chkPairPicked [] rootBounds 0 14 1 0x200000000000000000000000000000000000000000 0 false = false := by
+theorem caseBinary_0_and : rootPairCheck 0x200000000000000000000000000000000000000000 false = false := by
   apply initialBinary_from_frontier 0x200000000000000000000000000000000000000000 false opening_0_and opening_0_and_complete
   intro state member
   simp [opening_0_and] at member
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem caseBinary_0_or : chkPairPicked [] rootBounds 0 14 1 0x200000000000000000000000000000000000000000 0 true = false := by
+theorem caseBinary_0_or : rootPairCheck 0x200000000000000000000000000000000000000000 true = false := by
   apply initialBinary_from_frontier 0x200000000000000000000000000000000000000000 true opening_0_or opening_0_or_complete
   intro state member
   simp only [opening_0_or, List.mem_singleton] at member
   subst state
   exact first0_checked
 
-theorem caseBinary_0 : chkRaw [] rootBounds 0 14 1 0x200000000000000000000000000000000000000000 0 = false := by
+theorem caseBinary_0 : rootCircuitCheck 0x200000000000000000000000000000000000000000 = false := by
   apply chkPair_picked
   intro kind
   cases kind
@@ -8315,7 +8424,7 @@ theorem caseBinary_0 : chkRaw [] rootBounds 0 14 1 0x200000000000000000000000000
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem caseBinary_1_and : chkPairPicked [] rootBounds 0 14 1 0x10000000000000000000000000000000000000000 0 false = false := by
+theorem caseBinary_1_and : rootPairCheck 0x10000000000000000000000000000000000000000 false = false := by
   apply initialBinary_from_frontier 0x10000000000000000000000000000000000000000 false opening_1_and opening_1_and_complete
   intro state member
   simp only [opening_1_and, List.mem_singleton] at member
@@ -8324,14 +8433,14 @@ theorem caseBinary_1_and : chkPairPicked [] rootBounds 0 14 1 0x1000000000000000
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem caseBinary_1_or : chkPairPicked [] rootBounds 0 14 1 0x10000000000000000000000000000000000000000 0 true = false := by
+theorem caseBinary_1_or : rootPairCheck 0x10000000000000000000000000000000000000000 true = false := by
   apply initialBinary_from_frontier 0x10000000000000000000000000000000000000000 true opening_1_or opening_1_or_complete
   intro state member
   simp only [opening_1_or, List.mem_singleton] at member
   subst state
   exact first2_checked
 
-theorem caseBinary_1 : chkRaw [] rootBounds 0 14 1 0x10000000000000000000000000000000000000000 0 = false := by
+theorem caseBinary_1 : rootCircuitCheck 0x10000000000000000000000000000000000000000 = false := by
   apply chkPair_picked
   intro kind
   cases kind
@@ -8340,7 +8449,7 @@ theorem caseBinary_1 : chkRaw [] rootBounds 0 14 1 0x100000000000000000000000000
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem caseBinary_2_and : chkPairPicked [] rootBounds 0 14 1 0x400000000000000000000000000000000000000000000000 0 false = false := by
+theorem caseBinary_2_and : rootPairCheck 0x400000000000000000000000000000000000000000000000 false = false := by
   apply initialBinary_from_frontier 0x400000000000000000000000000000000000000000000000 false opening_2_and opening_2_and_complete
   intro state member
   simp only [opening_2_and, List.mem_singleton] at member
@@ -8349,14 +8458,14 @@ theorem caseBinary_2_and : chkPairPicked [] rootBounds 0 14 1 0x4000000000000000
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem caseBinary_2_or : chkPairPicked [] rootBounds 0 14 1 0x400000000000000000000000000000000000000000000000 0 true = false := by
+theorem caseBinary_2_or : rootPairCheck 0x400000000000000000000000000000000000000000000000 true = false := by
   apply initialBinary_from_frontier 0x400000000000000000000000000000000000000000000000 true opening_2_or opening_2_or_complete
   intro state member
   simp only [opening_2_or, List.mem_singleton] at member
   subst state
   exact first4_checked
 
-theorem caseBinary_2 : chkRaw [] rootBounds 0 14 1 0x400000000000000000000000000000000000000000000000 0 = false := by
+theorem caseBinary_2 : rootCircuitCheck 0x400000000000000000000000000000000000000000000000 = false := by
   apply chkPair_picked
   intro kind
   cases kind
@@ -8365,7 +8474,7 @@ theorem caseBinary_2 : chkRaw [] rootBounds 0 14 1 0x400000000000000000000000000
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem caseBinary_3_and : chkPairPicked [] rootBounds 0 14 1 0x10000000000000000 0 false = false := by
+theorem caseBinary_3_and : rootPairCheck 0x10000000000000000 false = false := by
   apply initialBinary_from_frontier 0x10000000000000000 false opening_3_and opening_3_and_complete
   intro state member
   simp only [opening_3_and, List.mem_singleton] at member
@@ -8374,14 +8483,14 @@ theorem caseBinary_3_and : chkPairPicked [] rootBounds 0 14 1 0x1000000000000000
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem caseBinary_3_or : chkPairPicked [] rootBounds 0 14 1 0x10000000000000000 0 true = false := by
+theorem caseBinary_3_or : rootPairCheck 0x10000000000000000 true = false := by
   apply initialBinary_from_frontier 0x10000000000000000 true opening_3_or opening_3_or_complete
   intro state member
   simp only [opening_3_or, List.mem_singleton] at member
   subst state
   exact first6_checked
 
-theorem caseBinary_3 : chkRaw [] rootBounds 0 14 1 0x10000000000000000 0 = false := by
+theorem caseBinary_3 : rootCircuitCheck 0x10000000000000000 = false := by
   apply chkPair_picked
   intro kind
   cases kind
@@ -8390,21 +8499,21 @@ theorem caseBinary_3 : chkRaw [] rootBounds 0 14 1 0x10000000000000000 0 = false
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem caseBinary_4_and : chkPairPicked [] rootBounds 0 14 1 0x20000000000000 0 false = false := by
+theorem caseBinary_4_and : rootPairCheck 0x20000000000000 false = false := by
   apply initialBinary_from_frontier 0x20000000000000 false opening_4_and opening_4_and_complete
   intro state member
   simp [opening_4_and] at member
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem caseBinary_4_or : chkPairPicked [] rootBounds 0 14 1 0x20000000000000 0 true = false := by
+theorem caseBinary_4_or : rootPairCheck 0x20000000000000 true = false := by
   apply initialBinary_from_frontier 0x20000000000000 true opening_4_or opening_4_or_complete
   intro state member
   simp only [opening_4_or, List.mem_singleton] at member
   subst state
   exact first7_checked
 
-theorem caseBinary_4 : chkRaw [] rootBounds 0 14 1 0x20000000000000 0 = false := by
+theorem caseBinary_4 : rootCircuitCheck 0x20000000000000 = false := by
   apply chkPair_picked
   intro kind
   cases kind
@@ -8413,7 +8522,7 @@ theorem caseBinary_4 : chkRaw [] rootBounds 0 14 1 0x20000000000000 0 = false :=
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem caseBinary_5_and : chkPairPicked [] rootBounds 0 14 1 0x100000000000000000000000 0 false = false := by
+theorem caseBinary_5_and : rootPairCheck 0x100000000000000000000000 false = false := by
   apply initialBinary_from_frontier 0x100000000000000000000000 false opening_5_and opening_5_and_complete
   intro state member
   simp only [opening_5_and, List.mem_singleton] at member
@@ -8422,7 +8531,7 @@ theorem caseBinary_5_and : chkPairPicked [] rootBounds 0 14 1 0x1000000000000000
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem caseBinary_5_or : chkPairPicked [] rootBounds 0 14 1 0x100000000000000000000000 0 true = false := by
+theorem caseBinary_5_or : rootPairCheck 0x100000000000000000000000 true = false := by
   apply initialBinary_from_frontier 0x100000000000000000000000 true opening_5_or opening_5_or_complete
   intro state member
   simp only [opening_5_or, List.mem_cons, List.not_mem_nil, or_false] at member
@@ -8430,7 +8539,7 @@ theorem caseBinary_5_or : chkPairPicked [] rootBounds 0 14 1 0x10000000000000000
   · exact first9_checked
   · exact first10_checked
 
-theorem caseBinary_5 : chkRaw [] rootBounds 0 14 1 0x100000000000000000000000 0 = false := by
+theorem caseBinary_5 : rootCircuitCheck 0x100000000000000000000000 = false := by
   apply chkPair_picked
   intro kind
   cases kind
@@ -8439,21 +8548,21 @@ theorem caseBinary_5 : chkRaw [] rootBounds 0 14 1 0x100000000000000000000000 0 
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem caseBinary_6_and : chkPairPicked [] rootBounds 0 14 1 0x80000000000000000000000000000000000000000000000000 0 false = false := by
+theorem caseBinary_6_and : rootPairCheck 0x80000000000000000000000000000000000000000000000000 false = false := by
   apply initialBinary_from_frontier 0x80000000000000000000000000000000000000000000000000 false opening_6_and opening_6_and_complete
   intro state member
   simp [opening_6_and] at member
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem caseBinary_6_or : chkPairPicked [] rootBounds 0 14 1 0x80000000000000000000000000000000000000000000000000 0 true = false := by
+theorem caseBinary_6_or : rootPairCheck 0x80000000000000000000000000000000000000000000000000 true = false := by
   apply initialBinary_from_frontier 0x80000000000000000000000000000000000000000000000000 true opening_6_or opening_6_or_complete
   intro state member
   simp only [opening_6_or, List.mem_singleton] at member
   subst state
   exact first11_checked
 
-theorem caseBinary_6 : chkRaw [] rootBounds 0 14 1 0x80000000000000000000000000000000000000000000000000 0 = false := by
+theorem caseBinary_6 : rootCircuitCheck 0x80000000000000000000000000000000000000000000000000 = false := by
   apply chkPair_picked
   intro kind
   cases kind
@@ -8462,21 +8571,21 @@ theorem caseBinary_6 : chkRaw [] rootBounds 0 14 1 0x800000000000000000000000000
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem caseBinary_7_and : chkPairPicked [] rootBounds 0 14 1 0x1000000000000000000000000 0 false = false := by
+theorem caseBinary_7_and : rootPairCheck 0x1000000000000000000000000 false = false := by
   apply initialBinary_from_frontier 0x1000000000000000000000000 false opening_7_and opening_7_and_complete
   intro state member
   simp [opening_7_and] at member
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem caseBinary_7_or : chkPairPicked [] rootBounds 0 14 1 0x1000000000000000000000000 0 true = false := by
+theorem caseBinary_7_or : rootPairCheck 0x1000000000000000000000000 true = false := by
   apply initialBinary_from_frontier 0x1000000000000000000000000 true opening_7_or opening_7_or_complete
   intro state member
   simp only [opening_7_or, List.mem_singleton] at member
   subst state
   exact first12_checked
 
-theorem caseBinary_7 : chkRaw [] rootBounds 0 14 1 0x1000000000000000000000000 0 = false := by
+theorem caseBinary_7 : rootCircuitCheck 0x1000000000000000000000000 = false := by
   apply chkPair_picked
   intro kind
   cases kind
@@ -8485,21 +8594,21 @@ theorem caseBinary_7 : chkRaw [] rootBounds 0 14 1 0x1000000000000000000000000 0
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem caseBinary_9_and : chkPairPicked [] rootBounds 0 14 1 0x800000000000000000000000000000000 0 false = false := by
+theorem caseBinary_9_and : rootPairCheck 0x800000000000000000000000000000000 false = false := by
   apply initialBinary_from_frontier 0x800000000000000000000000000000000 false opening_9_and opening_9_and_complete
   intro state member
   simp [opening_9_and] at member
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem caseBinary_9_or : chkPairPicked [] rootBounds 0 14 1 0x800000000000000000000000000000000 0 true = false := by
+theorem caseBinary_9_or : rootPairCheck 0x800000000000000000000000000000000 true = false := by
   apply initialBinary_from_frontier 0x800000000000000000000000000000000 true opening_9_or opening_9_or_complete
   intro state member
   simp only [opening_9_or, List.mem_singleton] at member
   subst state
   exact first13_checked
 
-theorem caseBinary_9 : chkRaw [] rootBounds 0 14 1 0x800000000000000000000000000000000 0 = false := by
+theorem caseBinary_9 : rootCircuitCheck 0x800000000000000000000000000000000 = false := by
   apply chkPair_picked
   intro kind
   cases kind
@@ -8508,7 +8617,7 @@ theorem caseBinary_9 : chkRaw [] rootBounds 0 14 1 0x800000000000000000000000000
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem caseBinary_10_and : chkPairPicked [] rootBounds 0 14 1 0x400 0 false = false := by
+theorem caseBinary_10_and : rootPairCheck 0x400 false = false := by
   apply initialBinary_from_frontier 0x400 false opening_10_and opening_10_and_complete
   intro state member
   simp only [opening_10_and, List.mem_singleton] at member
@@ -8517,14 +8626,14 @@ theorem caseBinary_10_and : chkPairPicked [] rootBounds 0 14 1 0x400 0 false = f
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem caseBinary_10_or : chkPairPicked [] rootBounds 0 14 1 0x400 0 true = false := by
+theorem caseBinary_10_or : rootPairCheck 0x400 true = false := by
   apply initialBinary_from_frontier 0x400 true opening_10_or opening_10_or_complete
   intro state member
   simp only [opening_10_or, List.mem_singleton] at member
   subst state
   exact first15_checked
 
-theorem caseBinary_10 : chkRaw [] rootBounds 0 14 1 0x400 0 = false := by
+theorem caseBinary_10 : rootCircuitCheck 0x400 = false := by
   apply chkPair_picked
   intro kind
   cases kind
@@ -8533,21 +8642,21 @@ theorem caseBinary_10 : chkRaw [] rootBounds 0 14 1 0x400 0 = false := by
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem caseBinary_11_and : chkPairPicked [] rootBounds 0 14 1 0x8000000000000000000000 0 false = false := by
+theorem caseBinary_11_and : rootPairCheck 0x8000000000000000000000 false = false := by
   apply initialBinary_from_frontier 0x8000000000000000000000 false opening_11_and opening_11_and_complete
   intro state member
   simp [opening_11_and] at member
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem caseBinary_11_or : chkPairPicked [] rootBounds 0 14 1 0x8000000000000000000000 0 true = false := by
+theorem caseBinary_11_or : rootPairCheck 0x8000000000000000000000 true = false := by
   apply initialBinary_from_frontier 0x8000000000000000000000 true opening_11_or opening_11_or_complete
   intro state member
   simp only [opening_11_or, List.mem_singleton] at member
   subst state
   exact first16_checked
 
-theorem caseBinary_11 : chkRaw [] rootBounds 0 14 1 0x8000000000000000000000 0 = false := by
+theorem caseBinary_11 : rootCircuitCheck 0x8000000000000000000000 = false := by
   apply chkPair_picked
   intro kind
   cases kind
@@ -8556,7 +8665,7 @@ theorem caseBinary_11 : chkRaw [] rootBounds 0 14 1 0x8000000000000000000000 0 =
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem caseBinary_12_and : chkPairPicked [] rootBounds 0 14 1 0x40000000000000000000000000000000 0 false = false := by
+theorem caseBinary_12_and : rootPairCheck 0x40000000000000000000000000000000 false = false := by
   apply initialBinary_from_frontier 0x40000000000000000000000000000000 false opening_12_and opening_12_and_complete
   intro state member
   simp only [opening_12_and, List.mem_singleton] at member
@@ -8565,14 +8674,14 @@ theorem caseBinary_12_and : chkPairPicked [] rootBounds 0 14 1 0x400000000000000
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem caseBinary_12_or : chkPairPicked [] rootBounds 0 14 1 0x40000000000000000000000000000000 0 true = false := by
+theorem caseBinary_12_or : rootPairCheck 0x40000000000000000000000000000000 true = false := by
   apply initialBinary_from_frontier 0x40000000000000000000000000000000 true opening_12_or opening_12_or_complete
   intro state member
   simp only [opening_12_or, List.mem_singleton] at member
   subst state
   exact first18_checked
 
-theorem caseBinary_12 : chkRaw [] rootBounds 0 14 1 0x40000000000000000000000000000000 0 = false := by
+theorem caseBinary_12 : rootCircuitCheck 0x40000000000000000000000000000000 = false := by
   apply chkPair_picked
   intro kind
   cases kind
@@ -8581,14 +8690,14 @@ theorem caseBinary_12 : chkRaw [] rootBounds 0 14 1 0x40000000000000000000000000
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem caseBinary_13_and : chkPairPicked [] rootBounds 0 14 1 0x80000 0 false = false := by
+theorem caseBinary_13_and : rootPairCheck 0x80000 false = false := by
   apply initialBinary_from_frontier 0x80000 false opening_13_and opening_13_and_complete
   intro state member
   simp [opening_13_and] at member
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem caseBinary_13_or : chkPairPicked [] rootBounds 0 14 1 0x80000 0 true = false := by
+theorem caseBinary_13_or : rootPairCheck 0x80000 true = false := by
   apply initialBinary_from_frontier 0x80000 true opening_13_or opening_13_or_complete
   intro state member
   simp only [opening_13_or, List.mem_cons, List.not_mem_nil, or_false] at member
@@ -8596,14 +8705,14 @@ theorem caseBinary_13_or : chkPairPicked [] rootBounds 0 14 1 0x80000 0 true = f
   · exact first19_checked
   · exact first20_checked
 
-theorem caseBinary_13 : chkRaw [] rootBounds 0 14 1 0x80000 0 = false := by
+theorem caseBinary_13 : rootCircuitCheck 0x80000 = false := by
   apply chkPair_picked
   intro kind
   cases kind
   · exact caseBinary_13_and
   · exact caseBinary_13_or
 
-theorem binaryCertificates : BinaryCertificates rootBounds := by
+theorem binaryCertificates : BinaryCertificates rootReject rootBounds := by
   intro p hp
   simp only [binaryRepresentatives,List.mem_cons,List.not_mem_nil,or_false] at hp
   rcases hp with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
@@ -9215,7 +9324,7 @@ theorem onFinal : (∀ (gates : List PEqualNP.CircuitLowerBounds.Gate) (o : ℕ)
       have ht1 : t = 1 := by omega
       subst k
       subst t
-      exact fullExclusion rootBounds_p rootBounds_I iroot binaryCertificates unaryCertificates hS hl
+      exact fullExclusion rootReject_sound rootBounds_p rootBounds_I iroot binaryCertificates unaryCertificates hS hl
     have hw : witness.length = 15 := rfl
     exact ⟨witness, 22, witness_basis, by omega, fun x => (witness_eval x).trans (f_graph x)⟩
   · refine ⟨gates, o, ?_, le_rfl, hev⟩
