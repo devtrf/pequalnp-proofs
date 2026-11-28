@@ -5460,47 +5460,38 @@ theorem co1t1_res : chk [] q1 1 10 1 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co1t2_res : chk [] q1 1 10 2 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co1t3_res : chk [] q1 1 10 3 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co1t4_res : chk [] q1 1 10 4 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co1t5_res : chk [] q1 1 10 5 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co1t6_res : chk [] q1 1 10 6 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co1t7_res : chk [] q1 1 10 7 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co1t8_res : chk [] q1 1 10 8 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co1t9_res : chk [] q1 1 10 9 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co1t10_res : chk [] q1 1 10 10 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
@@ -5559,45 +5550,67 @@ lemma restrictedWitness (Q : List (ℕ × ℕ)) (Z t : ℕ) (M : List (ℕ × �
 
 def co2t0_cov : List (ℕ × ℕ) := [(0x0, 1), (0x20, 0), (0x2000, 0), (0x400000000, 0), (0x40000000000, 0), (0x400000000000000, 0), (0x800000000000000, 0), (0x8000000000000000, 0), (0x40000000000000000, 0), (0x100000000000000000, 0), (0x800000000000000000, 0), (0x10000000000000000000, 0), (0x800000000000000000000, 0), (0x10000000000000000000000, 0), (0x200000000000000000000000, 0), (0x10000000000000000000000000000, 0), (0x200000000000000000000000000000, 0), (0x4000000000000000000000000000000, 0), (0x200000000000000000000000000000000000, 0), (0x4000000000000000000000000000000000000, 0), (0x80000000000000000000000000000000000000, 0), (0x400000000000000000000000000000000000000000000000000, 0), (0x3ffbffffffffffff7bdffffbdeffffdef7ef6b73fffbfbffffdfdf, 0)]
 
-set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
-theorem co2t0batch0 : rangeCheck (restrictedTest q2 2 0 co2t0_cov) 0 4 = true := by decide +kernel
+noncomputable def co2zeroTest := restrictedTest q2 2 0 co2t0_cov
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem co2t0batch1 : rangeCheck (restrictedTest q2 2 0 co2t0_cov) 4 4 = true := by decide +kernel
+theorem co2zero0 : rangeCheck co2zeroTest 0 2 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem co2t0batch2 : rangeCheck (restrictedTest q2 2 0 co2t0_cov) 8 4 = true := by decide +kernel
+theorem co2zero1 : rangeCheck co2zeroTest 2 2 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem co2t0batch3 : rangeCheck (restrictedTest q2 2 0 co2t0_cov) 12 4 = true := by decide +kernel
+theorem co2zero2 : rangeCheck co2zeroTest 4 2 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem co2t0batch4 : rangeCheck (restrictedTest q2 2 0 co2t0_cov) 16 4 = true := by decide +kernel
+theorem co2zero3 : rangeCheck co2zeroTest 6 2 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem co2t0batch5 : rangeCheck (restrictedTest q2 2 0 co2t0_cov) 20 3 = true := by decide +kernel
+theorem co2zero4 : rangeCheck co2zeroTest 8 2 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem co2zero5 : rangeCheck co2zeroTest 10 2 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem co2zero6 : rangeCheck co2zeroTest 12 2 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem co2zero7 : rangeCheck co2zeroTest 14 2 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem co2zero8 : rangeCheck co2zeroTest 16 2 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem co2zero9 : rangeCheck co2zeroTest 18 2 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem co2zero10 : rangeCheck co2zeroTest 20 2 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem co2zero11 : rangeCheck co2zeroTest 22 1 = true := by decide +kernel
+
+abbrev co2zeroAppend := @rangeAppend co2zeroTest
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem co2zeroAll : rangeCheck co2zeroTest 0 23 = true :=
+  (@co2zeroAppend 0 12 11 (@co2zeroAppend 0 6 6 (@co2zeroAppend 0 2 4 co2zero0 (@co2zeroAppend 2 2 2 co2zero1 co2zero2)) (@co2zeroAppend 6 2 4 co2zero3 (@co2zeroAppend 8 2 2 co2zero4 co2zero5))) (@co2zeroAppend 12 6 5 (@co2zeroAppend 12 2 4 co2zero6 (@co2zeroAppend 14 2 2 co2zero7 co2zero8)) (@co2zeroAppend 18 2 3 co2zero9 (@co2zeroAppend 20 2 1 co2zero10 co2zero11))))
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
 lemma co2t0 : ∃ M : List (ℕ × ℕ), mFull M = true ∧ ∀ a ∈ M, chk [] q2 2 11 0 a.1 a.2 = false :=
-  restrictedWitness q2 2 0 co2t0_cov (by decide +kernel)
-    (@rangeAppend (restrictedTest q2 2 0 co2t0_cov) 0 12 11
-      (@rangeAppend (restrictedTest q2 2 0 co2t0_cov) 0 4 8
-       co2t0batch0
-       (@rangeAppend (restrictedTest q2 2 0 co2t0_cov) 4 4 4
-        co2t0batch1
-        co2t0batch2))
-      (@rangeAppend (restrictedTest q2 2 0 co2t0_cov) 12 4 7
-       co2t0batch3
-       (@rangeAppend (restrictedTest q2 2 0 co2t0_cov) 16 4 3
-        co2t0batch4
-        co2t0batch5)))
+  restrictedWitness q2 2 0 co2t0_cov (by decide +kernel) co2zeroAll
 
 def co2t1_cov : List (ℕ × ℕ) := [(0x0, 1), (0x20, 0), (0x2000, 0), (0x400000000, 0), (0x40000000000, 0), (0x400000000000000, 0), (0x800000000000000, 0), (0x8000000000000000, 0), (0x40000000000000000, 0), (0x100000000000000000, 0), (0x800000000000000000, 0), (0x10000000000000000000, 0), (0x800000000000000000000, 0), (0x10000000000000000000000, 0), (0x200000000000000000000000, 0), (0x10000000000000000000000000000, 0), (0x200000000000000000000000000000, 0), (0x4000000000000000000000000000000, 0), (0x200000000000000000000000000000000000, 0), (0x4000000000000000000000000000000000000, 0), (0x80000000000000000000000000000000000000, 0), (0x400000000000000000000000000000000000000000000000000, 0), (0x3ffbffffffffffff7bdffffbdeffffdef7ef6b73fffbfbffffdfdf, 0)]
 
@@ -5642,52 +5655,42 @@ lemma co2t1 : ∃ M : List (ℕ × ℕ), mFull M = true ∧ ∀ a ∈ M, chk [] 
         co2t1batch5)))
 
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co2t2_res : chk [] q2 2 11 2 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co2t3_res : chk [] q2 2 11 3 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co2t4_res : chk [] q2 2 11 4 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co2t5_res : chk [] q2 2 11 5 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co2t6_res : chk [] q2 2 11 6 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co2t7_res : chk [] q2 2 11 7 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co2t8_res : chk [] q2 2 11 8 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co2t9_res : chk [] q2 2 11 9 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co2t10_res : chk [] q2 2 11 10 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co2t11_res : chk [] q2 2 11 11 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
@@ -5724,47 +5727,38 @@ theorem co4t1_res : chk [] q4 4 10 1 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co4t2_res : chk [] q4 4 10 2 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co4t3_res : chk [] q4 4 10 3 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co4t4_res : chk [] q4 4 10 4 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co4t5_res : chk [] q4 4 10 5 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co4t6_res : chk [] q4 4 10 6 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co4t7_res : chk [] q4 4 10 7 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co4t8_res : chk [] q4 4 10 8 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co4t9_res : chk [] q4 4 10 9 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co4t10_res : chk [] q4 4 10 10 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
@@ -5895,52 +5889,42 @@ lemma co64t1 : ∃ M : List (ℕ × ℕ), mFull M = true ∧ ∀ a ∈ M, chk []
         co64t1batch5)))
 
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co64t2_res : chk [] q64 64 11 2 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co64t3_res : chk [] q64 64 11 3 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co64t4_res : chk [] q64 64 11 4 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co64t5_res : chk [] q64 64 11 5 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co64t6_res : chk [] q64 64 11 6 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co64t7_res : chk [] q64 64 11 7 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co64t8_res : chk [] q64 64 11 8 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co64t9_res : chk [] q64 64 11 9 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co64t10_res : chk [] q64 64 11 10 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co64t11_res : chk [] q64 64 11 11 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
@@ -5977,37 +5961,30 @@ theorem co128t1_res : chk [] q128 128 8 1 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co128t2_res : chk [] q128 128 8 2 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co128t3_res : chk [] q128 128 8 3 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co128t4_res : chk [] q128 128 8 4 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co128t5_res : chk [] q128 128 8 5 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co128t6_res : chk [] q128 128 8 6 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co128t7_res : chk [] q128 128 8 7 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem co128t8_res : chk [] q128 128 8 8 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
@@ -6097,52 +6074,42 @@ theorem root3_res : chk [] rootBounds 0 13 3 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem root4_res : chk [] rootBounds 0 13 4 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem root5_res : chk [] rootBounds 0 13 5 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem root6_res : chk [] rootBounds 0 13 6 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem root7_res : chk [] rootBounds 0 13 7 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem root8_res : chk [] rootBounds 0 13 8 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem root9_res : chk [] rootBounds 0 13 9 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem root10_res : chk [] rootBounds 0 13 10 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem root11_res : chk [] rootBounds 0 13 11 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem root12_res : chk [] rootBounds 0 13 12 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem root13_res : chk [] rootBounds 0 13 13 FF 1 = false := by
   rw [← chkFast_eq]
   decide +kernel
@@ -6844,132 +6811,106 @@ lemma initialBinary_from_frontier (H : ℕ) (kind : Bool) (states : List (ℕ ×
 
 noncomputable def opening_0_and : List (ℕ × List W) := []
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem opening_0_and_complete : initialBinary 0x200000000000000000000000000000000000000000 false (frontierMissing opening_0_and) = false := by decide +kernel
 
 noncomputable def opening_0_or : List (ℕ × List W) := [⟨0x9ce55ace74a527294e929ce7394e739d6939ce72952939ce948ce9394e72a465194a11, rootWithGate 4 5 255 true⟩]
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem opening_0_or_complete : initialBinary 0x200000000000000000000000000000000000000000 true (frontierMissing opening_0_or) = false := by decide +kernel
 
 noncomputable def opening_1_and : List (ℕ × List W) := [⟨0x8d295ace359d294a4e94a46918ca54956b39ce338d291a4a9294a548ca52a465194230, rootWithGate 5 7 255 false⟩]
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem opening_1_and_complete : initialBinary 0x10000000000000000000000000000000000000000 false (frontierMissing opening_1_and) = false := by decide +kernel
 
 noncomputable def opening_1_or : List (ℕ × List W) := [⟨0x95295ace55a5294a4e94a4a9294e549d6b39ce5395292a4e9394e7494e53a465194631, rootWithGate 5 7 255 true⟩]
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem opening_1_or_complete : initialBinary 0x10000000000000000000000000000000000000000 true (frontierMissing opening_1_or) = false := by decide +kernel
 
 noncomputable def opening_2_and : List (ℕ × List W) := [⟨0x8d295ac6759d294a4e94a4e918ca52a56b39c6738d253a4a5494a528d252a465184a30, rootWithGate 5 6 255 false⟩]
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem opening_2_and_complete : initialBinary 0x400000000000000000000000000000000000000000000000 false (frontierMissing opening_2_and) = false := by decide +kernel
 
 noncomputable def opening_2_or : List (ℕ × List W) := [⟨0x95295aca75a5294a4e94a4e928ca73a56b39ca7395273a4e7494e738d273a46518ca31, rootWithGate 5 6 255 true⟩]
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem opening_2_or_complete : initialBinary 0x400000000000000000000000000000000000000000000000 true (frontierMissing opening_2_or) = false := by decide +kernel
 
 noncomputable def opening_3_and : List (ℕ × List W) := [⟨0x9d293ace759d294a4e94a46938ca54a56b19ce738ca5194a9494a948d252a461194a30, rootWithGate 2 5 255 false⟩]
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem opening_3_and_complete : initialBinary 0x10000000000000000 false (frontierMissing opening_3_and) = false := by decide +kernel
 
 noncomputable def opening_3_or : List (ℕ × List W) := [⟨0x9d294ace75a5294a4e94a4a9394a54a56b29ce7394e729ca9494e9495273a463194a31, rootWithGate 2 5 255 true⟩]
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem opening_3_or_complete : initialBinary 0x10000000000000000 true (frontierMissing opening_3_or) = false := by decide +kernel
 
 noncomputable def opening_4_and : List (ℕ × List W) := []
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem opening_4_and_complete : initialBinary 0x20000000000000 false (frontierMissing opening_4_and) = false := by decide +kernel
 
 noncomputable def opening_4_or : List (ℕ × List W) := [⟨0x8d2939c6339d294a4694a4a728ce74a56b294a528d293a4e9494e9495273a425194a31, rootWithGate 1 5 255 true⟩]
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem opening_4_or_complete : initialBinary 0x20000000000000 true (frontierMissing opening_4_or) = false := by decide +kernel
 
 noncomputable def opening_5_and : List (ℕ × List W) := [⟨0x9ca55ace759ca92a4e9494e938ca54a4e739ce738d293a4a9494a948d2529465194a30, rootWithGate 0 5 255 false⟩]
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem opening_5_and_complete : initialBinary 0x100000000000000000000000 false (frontierMissing opening_5_and) = false := by decide +kernel
 
 noncomputable def opening_5_or : List (ℕ × List W) := [⟨0x9ce75ace75a4e93a4e949ce9394e74a52939ce7395293a4e9494e94952739c65194a31, rootWithGate 0 5 255 true⟩, ⟨0x8ce539c6339d272946929ca52952939d69294a51952939d2948d2939ce93a425194a12, rootWithGate 1 4 255 true⟩]
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem opening_5_or_complete : initialBinary 0x100000000000000000000000 true (frontierMissing opening_5_or) = false := by decide +kernel
 
 noncomputable def opening_6_and : List (ℕ × List W) := []
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem opening_6_and_complete : initialBinary 0x80000000000000000000000000000000000000000000000000 false (frontierMissing opening_6_and) = false := by decide +kernel
 
 noncomputable def opening_6_or : List (ℕ × List W) := [⟨0x94e55ace54ad27294e929ca729d273956939ce529d2929d2938d2739ca73a465194612, rootWithGate 4 7 255 true⟩]
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem opening_6_or_complete : initialBinary 0x80000000000000000000000000000000000000000000000000 true (frontierMissing opening_6_or) = false := by decide +kernel
 
 noncomputable def opening_7_and : List (ℕ × List W) := []
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem opening_7_and_complete : initialBinary 0x1000000000000000000000000 false (frontierMissing opening_7_and) = false := by decide +kernel
 
 noncomputable def opening_7_or : List (ℕ × List W) := [⟨0x9ca55a4e74aca5294e5294e539d2929529394e729ce939d27384e939ce93a465094a12, rootWithGate 3 4 255 true⟩]
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem opening_7_or_complete : initialBinary 0x1000000000000000000000000 true (frontierMissing opening_7_or) = false := by decide +kernel
 
 noncomputable def opening_9_and : List (ℕ × List W) := []
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem opening_9_and_complete : initialBinary 0x800000000000000000000000000000000 false (frontierMissing opening_9_and) = false := by decide +kernel
 
 noncomputable def opening_9_or : List (ℕ × List W) := [⟨0x9ca55ace74ace7294e9294e739d2939d2739ce729d2939d2948d2939ce939c65194a12, rootWithGate 0 4 255 true⟩]
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem opening_9_or_complete : initialBinary 0x800000000000000000000000000000000 true (frontierMissing opening_9_or) = false := by decide +kernel
 
 noncomputable def opening_10_and : List (ℕ × List W) := [⟨0x8d295ac635ad294a4e94a46918ca52956b39c6339d251a5252952528ca54a465184232, rootWithGate 6 7 255 false⟩]
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem opening_10_and_complete : initialBinary 0x400 false (frontierMissing opening_10_and) = false := by decide +kernel
 
 noncomputable def opening_10_or : List (ℕ × List W) := [⟨0x8d295aca55ad294a4e94a4a9194e739d6b39ca539d272a52739525394e74a46518c632, rootWithGate 6 7 255 true⟩]
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem opening_10_or_complete : initialBinary 0x400 true (frontierMissing opening_10_or) = false := by decide +kernel
 
 noncomputable def opening_11_and : List (ℕ × List W) := []
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem opening_11_and_complete : initialBinary 0x8000000000000000000000 false (frontierMissing opening_11_and) = false := by decide +kernel
 
 noncomputable def opening_11_or : List (ℕ × List W) := [⟨0x8d2939c6339d294a4694a4671952749d6b294a3295292a5293952749ce74a425194632, rootWithGate 1 7 255 true⟩]
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem opening_11_or_complete : initialBinary 0x8000000000000000000000 true (frontierMissing opening_11_or) = false := by decide +kernel
 
 noncomputable def opening_12_and : List (ℕ × List W) := [⟨0x8ca55ace35aca92a4e94946919d25494e739ce339d291a5292952549ca549465194232, rootWithGate 0 7 255 false⟩]
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem opening_12_and_complete : initialBinary 0x40000000000000000000000000000000 false (frontierMissing opening_12_and) = false := by decide +kernel
 
 noncomputable def opening_12_or : List (ℕ × List W) := [⟨0x94e75ace55ace93a4e949ca929d2749d2939ce539d292a5293952749ce749c65194632, rootWithGate 0 7 255 true⟩]
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem opening_12_or_complete : initialBinary 0x40000000000000000000000000000000 true (frontierMissing opening_12_or) = false := by decide +kernel
 
 noncomputable def opening_13_and : List (ℕ × List W) := []
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem opening_13_and_complete : initialBinary 0x80000 false (frontierMissing opening_13_and) = false := by decide +kernel
 
 noncomputable def opening_13_or : List (ℕ × List W) := [⟨0x8ce739c6339ce93a46949ca7295294a529294a5295293a5294952949d2949c25194a32, rootWithGate 0 1 255 true⟩, ⟨0x94e74a4a54a4e93a4a949ce939d294a52939ce739d293a5294952949d2949c65194a32, rootWithGate 0 1 253 true⟩]
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 theorem opening_13_or_complete : initialBinary 0x80000 true (frontierMissing opening_13_or) = false := by decide +kernel
 
 abbrev SearchState := ℕ × List W
@@ -7400,17 +7341,24 @@ noncomputable def pureGate (id : ℕ) : W × ℕ :=
   let b := rootPreparedWords.getD ((code >>> 3) % 8) empty
   (opW (code.testBit 6) a b, Nat.lor a.c b.c)
 
+def retainedInputs (inputs : List W) : ℕ → List W :=
+  List.rec (motive := fun _ => ℕ → List W) (fun _ => [])
+    (fun wire _ rest bits =>
+      let tail := rest (bits >>> 1)
+      if bits.testBit 0 then wire :: tail else tail) inputs
+
 -- Each entry contains the retained input mask and the three gates that produced the other wires.
 noncomputable def thirdAt (i : ℕ) : SearchState :=
   let block := thirdEncodedStocks.getD (i / 32) 0
   let entry := (block >>> (26 * (i % 32))) % 67108864
-  let raw := (rootPreparedWords.zipIdx.filter fun w => entry.testBit w.2).map Prod.fst
+  let raw := retainedInputs rootPreparedWords entry
   let a := pureGate ((entry >>> 8) % 64)
   let b := pureGate ((entry >>> 14) % 64)
   let c := pureGate ((entry >>> 20) % 64)
   let stock := addS a.1 (addS b.1 (addS c.1 raw))
   let paid := Nat.add a.2 (Nat.add b.2 c.2)
-  (rootPreparedBudget - (paid + sumc stock), stock)
+  -- The budget depends on the retained wires, independently of their order.
+  (rootPreparedBudget - (paid + sumc (a.1 :: b.1 :: c.1 :: raw)), stock)
 
 noncomputable def mixedFromSecond (state : SearchState) : Bool :=
   frc state.2 (fun v => st state.1 (fun z =>
@@ -7900,177 +7848,237 @@ theorem mixedChunkAll : rangeCheck secondMixedTest 0 secondCount = true := by
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk0 : rangeCheck thirdTest 0 80 = true := by decide +kernel
+theorem thirdChunk0 : rangeCheck thirdTest 0 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk1 : rangeCheck thirdTest 80 80 = true := by decide +kernel
+theorem thirdChunk1 : rangeCheck thirdTest 62 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk2 : rangeCheck thirdTest 160 80 = true := by decide +kernel
+theorem thirdChunk2 : rangeCheck thirdTest 124 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk3 : rangeCheck thirdTest 240 80 = true := by decide +kernel
+theorem thirdChunk3 : rangeCheck thirdTest 186 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk4 : rangeCheck thirdTest 320 80 = true := by decide +kernel
+theorem thirdChunk4 : rangeCheck thirdTest 248 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk5 : rangeCheck thirdTest 400 80 = true := by decide +kernel
+theorem thirdChunk5 : rangeCheck thirdTest 310 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk6 : rangeCheck thirdTest 480 80 = true := by decide +kernel
+theorem thirdChunk6 : rangeCheck thirdTest 372 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk7 : rangeCheck thirdTest 560 80 = true := by decide +kernel
+theorem thirdChunk7 : rangeCheck thirdTest 434 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk8 : rangeCheck thirdTest 640 80 = true := by decide +kernel
+theorem thirdChunk8 : rangeCheck thirdTest 496 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk9 : rangeCheck thirdTest 720 80 = true := by decide +kernel
+theorem thirdChunk9 : rangeCheck thirdTest 558 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk10 : rangeCheck thirdTest 800 80 = true := by decide +kernel
+theorem thirdChunk10 : rangeCheck thirdTest 620 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk11 : rangeCheck thirdTest 880 58 = true := by decide +kernel
+theorem thirdChunk11 : rangeCheck thirdTest 682 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk12 : rangeCheck thirdTest 938 80 = true := by decide +kernel
+theorem thirdChunk12 : rangeCheck thirdTest 744 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk13 : rangeCheck thirdTest 1018 80 = true := by decide +kernel
+theorem thirdChunk13 : rangeCheck thirdTest 806 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk14 : rangeCheck thirdTest 1098 80 = true := by decide +kernel
+theorem thirdChunk14 : rangeCheck thirdTest 868 55 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk15 : rangeCheck thirdTest 1178 79 = true := by decide +kernel
+theorem thirdChunk15 : rangeCheck thirdTest 923 43 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk16 : rangeCheck thirdTest 1257 80 = true := by decide +kernel
+theorem thirdChunk16 : rangeCheck thirdTest 966 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk17 : rangeCheck thirdTest 1337 80 = true := by decide +kernel
+theorem thirdChunk17 : rangeCheck thirdTest 1028 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk18 : rangeCheck thirdTest 1417 80 = true := by decide +kernel
+theorem thirdChunk18 : rangeCheck thirdTest 1090 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk19 : rangeCheck thirdTest 1497 80 = true := by decide +kernel
+theorem thirdChunk19 : rangeCheck thirdTest 1152 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk20 : rangeCheck thirdTest 1577 80 = true := by decide +kernel
+theorem thirdChunk20 : rangeCheck thirdTest 1214 41 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk21 : rangeCheck thirdTest 1657 80 = true := by decide +kernel
+theorem thirdChunk21 : rangeCheck thirdTest 1255 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk22 : rangeCheck thirdTest 1737 53 = true := by decide +kernel
+theorem thirdChunk22 : rangeCheck thirdTest 1317 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk23 : rangeCheck thirdTest 1790 80 = true := by decide +kernel
+theorem thirdChunk23 : rangeCheck thirdTest 1379 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk24 : rangeCheck thirdTest 1870 80 = true := by decide +kernel
+theorem thirdChunk24 : rangeCheck thirdTest 1441 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk25 : rangeCheck thirdTest 1950 80 = true := by decide +kernel
+theorem thirdChunk25 : rangeCheck thirdTest 1503 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk26 : rangeCheck thirdTest 2030 80 = true := by decide +kernel
+theorem thirdChunk26 : rangeCheck thirdTest 1565 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk27 : rangeCheck thirdTest 2110 80 = true := by decide +kernel
+theorem thirdChunk27 : rangeCheck thirdTest 1627 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk28 : rangeCheck thirdTest 2190 80 = true := by decide +kernel
+theorem thirdChunk28 : rangeCheck thirdTest 1689 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk29 : rangeCheck thirdTest 2270 80 = true := by decide +kernel
+theorem thirdChunk29 : rangeCheck thirdTest 1751 30 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk30 : rangeCheck thirdTest 2350 72 = true := by decide +kernel
+theorem thirdChunk30 : rangeCheck thirdTest 1781 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk31 : rangeCheck thirdTest 2422 66 = true := by decide +kernel
+theorem thirdChunk31 : rangeCheck thirdTest 1843 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk32 : rangeCheck thirdTest 2488 80 = true := by decide +kernel
+theorem thirdChunk32 : rangeCheck thirdTest 1905 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk33 : rangeCheck thirdTest 2568 63 = true := by decide +kernel
+theorem thirdChunk33 : rangeCheck thirdTest 1967 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk34 : rangeCheck thirdTest 2631 80 = true := by decide +kernel
+theorem thirdChunk34 : rangeCheck thirdTest 2029 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk35 : rangeCheck thirdTest 2711 80 = true := by decide +kernel
+theorem thirdChunk35 : rangeCheck thirdTest 2091 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk36 : rangeCheck thirdTest 2791 80 = true := by decide +kernel
+theorem thirdChunk36 : rangeCheck thirdTest 2153 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk37 : rangeCheck thirdTest 2871 80 = true := by decide +kernel
+theorem thirdChunk37 : rangeCheck thirdTest 2215 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk38 : rangeCheck thirdTest 2951 71 = true := by decide +kernel
+theorem thirdChunk38 : rangeCheck thirdTest 2277 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk39 : rangeCheck thirdTest 3022 41 = true := by decide +kernel
+theorem thirdChunk39 : rangeCheck thirdTest 2339 51 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem thirdChunk40 : rangeCheck thirdTest 3063 16 = true := by decide +kernel
+theorem thirdChunk40 : rangeCheck thirdTest 2390 47 = true := by decide +kernel
 
-abbrev appendTail := @rangeAppend thirdTest
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem thirdChunk41 : rangeCheck thirdTest 2437 62 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem thirdChunk42 : rangeCheck thirdTest 2499 62 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem thirdChunk43 : rangeCheck thirdTest 2561 59 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem thirdChunk44 : rangeCheck thirdTest 2620 62 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem thirdChunk45 : rangeCheck thirdTest 2682 62 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem thirdChunk46 : rangeCheck thirdTest 2744 62 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem thirdChunk47 : rangeCheck thirdTest 2806 62 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem thirdChunk48 : rangeCheck thirdTest 2868 45 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem thirdChunk49 : rangeCheck thirdTest 2913 62 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem thirdChunk50 : rangeCheck thirdTest 2975 48 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem thirdChunk51 : rangeCheck thirdTest 3023 33 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem thirdChunk52 : rangeCheck thirdTest 3056 23 = true := by decide +kernel
+
+abbrev thirdChunkAppend := @rangeAppend thirdTest
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
 theorem thirdChunkAll : rangeCheck thirdTest 0 3079 = true :=
-  (@appendTail 0 1577 1502 (@appendTail 0 800 777 (@appendTail 0 400 400 (@appendTail 0 160 240 (@appendTail 0 80 80 thirdChunk0 thirdChunk1) (@appendTail 160 80 160 thirdChunk2 (@appendTail 240 80 80 thirdChunk3 thirdChunk4))) (@appendTail 400 160 240 (@appendTail 400 80 80 thirdChunk5 thirdChunk6) (@appendTail 560 80 160 thirdChunk7 (@appendTail 640 80 80 thirdChunk8 thirdChunk9)))) (@appendTail 800 378 399 (@appendTail 800 138 240 (@appendTail 800 80 58 thirdChunk10 thirdChunk11) (@appendTail 938 80 160 thirdChunk12 (@appendTail 1018 80 80 thirdChunk13 thirdChunk14))) (@appendTail 1178 159 240 (@appendTail 1178 79 80 thirdChunk15 thirdChunk16) (@appendTail 1337 80 160 thirdChunk17 (@appendTail 1417 80 80 thirdChunk18 thirdChunk19))))) (@appendTail 1577 773 729 (@appendTail 1577 373 400 (@appendTail 1577 160 213 (@appendTail 1577 80 80 thirdChunk20 thirdChunk21) (@appendTail 1737 53 160 thirdChunk22 (@appendTail 1790 80 80 thirdChunk23 thirdChunk24))) (@appendTail 1950 160 240 (@appendTail 1950 80 80 thirdChunk25 thirdChunk26) (@appendTail 2110 80 160 thirdChunk27 (@appendTail 2190 80 80 thirdChunk28 thirdChunk29)))) (@appendTail 2350 361 368 (@appendTail 2350 138 223 (@appendTail 2350 72 66 thirdChunk30 thirdChunk31) (@appendTail 2488 80 143 thirdChunk32 (@appendTail 2568 63 80 thirdChunk33 thirdChunk34))) (@appendTail 2711 240 128 (@appendTail 2711 80 160 thirdChunk35 (@appendTail 2791 80 80 thirdChunk36 thirdChunk37)) (@appendTail 2951 71 57 thirdChunk38 (@appendTail 3022 41 16 thirdChunk39 thirdChunk40))))))
+  (@thirdChunkAppend 0 1565 1514 (@thirdChunkAppend 0 806 759 (@thirdChunkAppend 0 372 434 (@thirdChunkAppend 0 186 186 (@thirdChunkAppend 0 62 124 thirdChunk0 (@thirdChunkAppend 62 62 62 thirdChunk1 thirdChunk2)) (@thirdChunkAppend 186 62 124 thirdChunk3 (@thirdChunkAppend 248 62 62 thirdChunk4 thirdChunk5))) (@thirdChunkAppend 372 186 248 (@thirdChunkAppend 372 62 124 thirdChunk6 (@thirdChunkAppend 434 62 62 thirdChunk7 thirdChunk8)) (@thirdChunkAppend 558 124 124 (@thirdChunkAppend 558 62 62 thirdChunk9 thirdChunk10) (@thirdChunkAppend 682 62 62 thirdChunk11 thirdChunk12)))) (@thirdChunkAppend 806 346 413 (@thirdChunkAppend 806 160 186 (@thirdChunkAppend 806 62 98 thirdChunk13 (@thirdChunkAppend 868 55 43 thirdChunk14 thirdChunk15)) (@thirdChunkAppend 966 62 124 thirdChunk16 (@thirdChunkAppend 1028 62 62 thirdChunk17 thirdChunk18))) (@thirdChunkAppend 1152 165 248 (@thirdChunkAppend 1152 62 103 thirdChunk19 (@thirdChunkAppend 1214 41 62 thirdChunk20 thirdChunk21)) (@thirdChunkAppend 1317 124 124 (@thirdChunkAppend 1317 62 62 thirdChunk22 thirdChunk23) (@thirdChunkAppend 1441 62 62 thirdChunk24 thirdChunk25))))) (@thirdChunkAppend 1565 774 740 (@thirdChunkAppend 1565 340 434 (@thirdChunkAppend 1565 186 154 (@thirdChunkAppend 1565 62 124 thirdChunk26 (@thirdChunkAppend 1627 62 62 thirdChunk27 thirdChunk28)) (@thirdChunkAppend 1751 30 124 thirdChunk29 (@thirdChunkAppend 1781 62 62 thirdChunk30 thirdChunk31))) (@thirdChunkAppend 1905 186 248 (@thirdChunkAppend 1905 62 124 thirdChunk32 (@thirdChunkAppend 1967 62 62 thirdChunk33 thirdChunk34)) (@thirdChunkAppend 2091 124 124 (@thirdChunkAppend 2091 62 62 thirdChunk35 thirdChunk36) (@thirdChunkAppend 2215 62 62 thirdChunk37 thirdChunk38)))) (@thirdChunkAppend 2339 405 335 (@thirdChunkAppend 2339 160 245 (@thirdChunkAppend 2339 51 109 thirdChunk39 (@thirdChunkAppend 2390 47 62 thirdChunk40 thirdChunk41)) (@thirdChunkAppend 2499 121 124 (@thirdChunkAppend 2499 62 59 thirdChunk42 thirdChunk43) (@thirdChunkAppend 2620 62 62 thirdChunk44 thirdChunk45))) (@thirdChunkAppend 2744 169 166 (@thirdChunkAppend 2744 62 107 thirdChunk46 (@thirdChunkAppend 2806 62 45 thirdChunk47 thirdChunk48)) (@thirdChunkAppend 2913 110 56 (@thirdChunkAppend 2913 62 48 thirdChunk49 thirdChunk50) (@thirdChunkAppend 3023 33 23 thirdChunk51 thirdChunk52))))))
 
 theorem completeSecondTable : secondGroups.all groupChecked = true :=
   checkedSecondGroups coverageChunkAll mixedChunkAll thirdChunkAll
+
+noncomputable def firstContinuation (state : SearchState) : Bool :=
+  look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1 state.1 state.2
+
+lemma certifyFirst (i : ℕ) (ids : List ℕ)
+    (two : 1 < (firstAt i).2.length) (small : (firstAt i).2.length < 12)
+    (mixed : mixedSecond (firstAt i) = false)
+    (complete : pureSecond (firstAt i) (frontierMissing (ids.map secondAt)) = false)
+    (valid : ids.all indexValid = true) : firstContinuation (firstAt i) = false :=
+  afterFirst_false (firstAt i) two small mixed
+    (pureSecond_from_frontier (firstAt i) (ids.map secondAt) complete
+      (checkIndexTable completeSecondTable valid))
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8078,12 +8086,9 @@ theorem first0_mixed : mixedSecond (firstAt 0) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first0_checked :
-    look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1
-      (firstAt 0).1 (firstAt 0).2 = false := by
-  apply afterFirst_false (firstAt 0) (by decide +kernel) (by decide +kernel) first0_mixed
-  apply pureSecond_from_frontier _ (successors0.map secondAt) successors0_complete
-  exact checkIndexTable completeSecondTable (by decide +kernel)
+theorem first0_checked : firstContinuation (firstAt 0) = false :=
+  certifyFirst 0 successors0 (by decide +kernel) (by decide +kernel)
+    first0_mixed successors0_complete (by decide +kernel)
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8091,12 +8096,9 @@ theorem first1_mixed : mixedSecond (firstAt 1) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first1_checked :
-    look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1
-      (firstAt 1).1 (firstAt 1).2 = false := by
-  apply afterFirst_false (firstAt 1) (by decide +kernel) (by decide +kernel) first1_mixed
-  apply pureSecond_from_frontier _ (successors1.map secondAt) successors1_complete
-  exact checkIndexTable completeSecondTable (by decide +kernel)
+theorem first1_checked : firstContinuation (firstAt 1) = false :=
+  certifyFirst 1 successors1 (by decide +kernel) (by decide +kernel)
+    first1_mixed successors1_complete (by decide +kernel)
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8104,12 +8106,9 @@ theorem first2_mixed : mixedSecond (firstAt 2) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first2_checked :
-    look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1
-      (firstAt 2).1 (firstAt 2).2 = false := by
-  apply afterFirst_false (firstAt 2) (by decide +kernel) (by decide +kernel) first2_mixed
-  apply pureSecond_from_frontier _ (successors2.map secondAt) successors2_complete
-  exact checkIndexTable completeSecondTable (by decide +kernel)
+theorem first2_checked : firstContinuation (firstAt 2) = false :=
+  certifyFirst 2 successors2 (by decide +kernel) (by decide +kernel)
+    first2_mixed successors2_complete (by decide +kernel)
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8117,12 +8116,9 @@ theorem first3_mixed : mixedSecond (firstAt 3) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first3_checked :
-    look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1
-      (firstAt 3).1 (firstAt 3).2 = false := by
-  apply afterFirst_false (firstAt 3) (by decide +kernel) (by decide +kernel) first3_mixed
-  apply pureSecond_from_frontier _ (successors3.map secondAt) successors3_complete
-  exact checkIndexTable completeSecondTable (by decide +kernel)
+theorem first3_checked : firstContinuation (firstAt 3) = false :=
+  certifyFirst 3 successors3 (by decide +kernel) (by decide +kernel)
+    first3_mixed successors3_complete (by decide +kernel)
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8130,12 +8126,9 @@ theorem first4_mixed : mixedSecond (firstAt 4) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first4_checked :
-    look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1
-      (firstAt 4).1 (firstAt 4).2 = false := by
-  apply afterFirst_false (firstAt 4) (by decide +kernel) (by decide +kernel) first4_mixed
-  apply pureSecond_from_frontier _ (successors4.map secondAt) successors4_complete
-  exact checkIndexTable completeSecondTable (by decide +kernel)
+theorem first4_checked : firstContinuation (firstAt 4) = false :=
+  certifyFirst 4 successors4 (by decide +kernel) (by decide +kernel)
+    first4_mixed successors4_complete (by decide +kernel)
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8143,12 +8136,9 @@ theorem first5_mixed : mixedSecond (firstAt 5) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first5_checked :
-    look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1
-      (firstAt 5).1 (firstAt 5).2 = false := by
-  apply afterFirst_false (firstAt 5) (by decide +kernel) (by decide +kernel) first5_mixed
-  apply pureSecond_from_frontier _ (successors5.map secondAt) successors5_complete
-  exact checkIndexTable completeSecondTable (by decide +kernel)
+theorem first5_checked : firstContinuation (firstAt 5) = false :=
+  certifyFirst 5 successors5 (by decide +kernel) (by decide +kernel)
+    first5_mixed successors5_complete (by decide +kernel)
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8156,12 +8146,9 @@ theorem first6_mixed : mixedSecond (firstAt 6) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first6_checked :
-    look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1
-      (firstAt 6).1 (firstAt 6).2 = false := by
-  apply afterFirst_false (firstAt 6) (by decide +kernel) (by decide +kernel) first6_mixed
-  apply pureSecond_from_frontier _ (successors6.map secondAt) successors6_complete
-  exact checkIndexTable completeSecondTable (by decide +kernel)
+theorem first6_checked : firstContinuation (firstAt 6) = false :=
+  certifyFirst 6 successors6 (by decide +kernel) (by decide +kernel)
+    first6_mixed successors6_complete (by decide +kernel)
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8169,12 +8156,9 @@ theorem first7_mixed : mixedSecond (firstAt 7) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first7_checked :
-    look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1
-      (firstAt 7).1 (firstAt 7).2 = false := by
-  apply afterFirst_false (firstAt 7) (by decide +kernel) (by decide +kernel) first7_mixed
-  apply pureSecond_from_frontier _ (successors7.map secondAt) successors7_complete
-  exact checkIndexTable completeSecondTable (by decide +kernel)
+theorem first7_checked : firstContinuation (firstAt 7) = false :=
+  certifyFirst 7 successors7 (by decide +kernel) (by decide +kernel)
+    first7_mixed successors7_complete (by decide +kernel)
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8182,12 +8166,9 @@ theorem first8_mixed : mixedSecond (firstAt 8) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first8_checked :
-    look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1
-      (firstAt 8).1 (firstAt 8).2 = false := by
-  apply afterFirst_false (firstAt 8) (by decide +kernel) (by decide +kernel) first8_mixed
-  apply pureSecond_from_frontier _ (successors8.map secondAt) successors8_complete
-  exact checkIndexTable completeSecondTable (by decide +kernel)
+theorem first8_checked : firstContinuation (firstAt 8) = false :=
+  certifyFirst 8 successors8 (by decide +kernel) (by decide +kernel)
+    first8_mixed successors8_complete (by decide +kernel)
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8195,12 +8176,9 @@ theorem first9_mixed : mixedSecond (firstAt 9) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first9_checked :
-    look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1
-      (firstAt 9).1 (firstAt 9).2 = false := by
-  apply afterFirst_false (firstAt 9) (by decide +kernel) (by decide +kernel) first9_mixed
-  apply pureSecond_from_frontier _ (successors9.map secondAt) successors9_complete
-  exact checkIndexTable completeSecondTable (by decide +kernel)
+theorem first9_checked : firstContinuation (firstAt 9) = false :=
+  certifyFirst 9 successors9 (by decide +kernel) (by decide +kernel)
+    first9_mixed successors9_complete (by decide +kernel)
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8208,12 +8186,9 @@ theorem first10_mixed : mixedSecond (firstAt 10) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first10_checked :
-    look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1
-      (firstAt 10).1 (firstAt 10).2 = false := by
-  apply afterFirst_false (firstAt 10) (by decide +kernel) (by decide +kernel) first10_mixed
-  apply pureSecond_from_frontier _ (successors10.map secondAt) successors10_complete
-  exact checkIndexTable completeSecondTable (by decide +kernel)
+theorem first10_checked : firstContinuation (firstAt 10) = false :=
+  certifyFirst 10 successors10 (by decide +kernel) (by decide +kernel)
+    first10_mixed successors10_complete (by decide +kernel)
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8221,12 +8196,9 @@ theorem first11_mixed : mixedSecond (firstAt 11) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first11_checked :
-    look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1
-      (firstAt 11).1 (firstAt 11).2 = false := by
-  apply afterFirst_false (firstAt 11) (by decide +kernel) (by decide +kernel) first11_mixed
-  apply pureSecond_from_frontier _ (successors11.map secondAt) successors11_complete
-  exact checkIndexTable completeSecondTable (by decide +kernel)
+theorem first11_checked : firstContinuation (firstAt 11) = false :=
+  certifyFirst 11 successors11 (by decide +kernel) (by decide +kernel)
+    first11_mixed successors11_complete (by decide +kernel)
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8234,12 +8206,9 @@ theorem first12_mixed : mixedSecond (firstAt 12) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first12_checked :
-    look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1
-      (firstAt 12).1 (firstAt 12).2 = false := by
-  apply afterFirst_false (firstAt 12) (by decide +kernel) (by decide +kernel) first12_mixed
-  apply pureSecond_from_frontier _ (successors12.map secondAt) successors12_complete
-  exact checkIndexTable completeSecondTable (by decide +kernel)
+theorem first12_checked : firstContinuation (firstAt 12) = false :=
+  certifyFirst 12 successors12 (by decide +kernel) (by decide +kernel)
+    first12_mixed successors12_complete (by decide +kernel)
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8247,12 +8216,9 @@ theorem first13_mixed : mixedSecond (firstAt 13) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first13_checked :
-    look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1
-      (firstAt 13).1 (firstAt 13).2 = false := by
-  apply afterFirst_false (firstAt 13) (by decide +kernel) (by decide +kernel) first13_mixed
-  apply pureSecond_from_frontier _ (successors13.map secondAt) successors13_complete
-  exact checkIndexTable completeSecondTable (by decide +kernel)
+theorem first13_checked : firstContinuation (firstAt 13) = false :=
+  certifyFirst 13 successors13 (by decide +kernel) (by decide +kernel)
+    first13_mixed successors13_complete (by decide +kernel)
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8260,12 +8226,9 @@ theorem first14_mixed : mixedSecond (firstAt 14) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first14_checked :
-    look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1
-      (firstAt 14).1 (firstAt 14).2 = false := by
-  apply afterFirst_false (firstAt 14) (by decide +kernel) (by decide +kernel) first14_mixed
-  apply pureSecond_from_frontier _ (successors14.map secondAt) successors14_complete
-  exact checkIndexTable completeSecondTable (by decide +kernel)
+theorem first14_checked : firstContinuation (firstAt 14) = false :=
+  certifyFirst 14 successors14 (by decide +kernel) (by decide +kernel)
+    first14_mixed successors14_complete (by decide +kernel)
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8273,12 +8236,9 @@ theorem first15_mixed : mixedSecond (firstAt 15) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first15_checked :
-    look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1
-      (firstAt 15).1 (firstAt 15).2 = false := by
-  apply afterFirst_false (firstAt 15) (by decide +kernel) (by decide +kernel) first15_mixed
-  apply pureSecond_from_frontier _ (successors15.map secondAt) successors15_complete
-  exact checkIndexTable completeSecondTable (by decide +kernel)
+theorem first15_checked : firstContinuation (firstAt 15) = false :=
+  certifyFirst 15 successors15 (by decide +kernel) (by decide +kernel)
+    first15_mixed successors15_complete (by decide +kernel)
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8286,12 +8246,9 @@ theorem first16_mixed : mixedSecond (firstAt 16) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first16_checked :
-    look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1
-      (firstAt 16).1 (firstAt 16).2 = false := by
-  apply afterFirst_false (firstAt 16) (by decide +kernel) (by decide +kernel) first16_mixed
-  apply pureSecond_from_frontier _ (successors16.map secondAt) successors16_complete
-  exact checkIndexTable completeSecondTable (by decide +kernel)
+theorem first16_checked : firstContinuation (firstAt 16) = false :=
+  certifyFirst 16 successors16 (by decide +kernel) (by decide +kernel)
+    first16_mixed successors16_complete (by decide +kernel)
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8299,12 +8256,9 @@ theorem first17_mixed : mixedSecond (firstAt 17) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first17_checked :
-    look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1
-      (firstAt 17).1 (firstAt 17).2 = false := by
-  apply afterFirst_false (firstAt 17) (by decide +kernel) (by decide +kernel) first17_mixed
-  apply pureSecond_from_frontier _ (successors17.map secondAt) successors17_complete
-  exact checkIndexTable completeSecondTable (by decide +kernel)
+theorem first17_checked : firstContinuation (firstAt 17) = false :=
+  certifyFirst 17 successors17 (by decide +kernel) (by decide +kernel)
+    first17_mixed successors17_complete (by decide +kernel)
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8312,12 +8266,9 @@ theorem first18_mixed : mixedSecond (firstAt 18) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first18_checked :
-    look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1
-      (firstAt 18).1 (firstAt 18).2 = false := by
-  apply afterFirst_false (firstAt 18) (by decide +kernel) (by decide +kernel) first18_mixed
-  apply pureSecond_from_frontier _ (successors18.map secondAt) successors18_complete
-  exact checkIndexTable completeSecondTable (by decide +kernel)
+theorem first18_checked : firstContinuation (firstAt 18) = false :=
+  certifyFirst 18 successors18 (by decide +kernel) (by decide +kernel)
+    first18_mixed successors18_complete (by decide +kernel)
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8325,12 +8276,9 @@ theorem first19_mixed : mixedSecond (firstAt 19) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first19_checked :
-    look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1
-      (firstAt 19).1 (firstAt 19).2 = false := by
-  apply afterFirst_false (firstAt 19) (by decide +kernel) (by decide +kernel) first19_mixed
-  apply pureSecond_from_frontier _ (successors19.map secondAt) successors19_complete
-  exact checkIndexTable completeSecondTable (by decide +kernel)
+theorem first19_checked : firstContinuation (firstAt 19) = false :=
+  certifyFirst 19 successors19 (by decide +kernel) (by decide +kernel)
+    first19_mixed successors19_complete (by decide +kernel)
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -8338,12 +8286,9 @@ theorem first20_mixed : mixedSecond (firstAt 20) = false := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem first20_checked :
-    look1RawC I.NN I.AA I.HX I.HY true I.AA rootPreparedMask rootPreparedSlots 14 14 13 1
-      (firstAt 20).1 (firstAt 20).2 = false := by
-  apply afterFirst_false (firstAt 20) (by decide +kernel) (by decide +kernel) first20_mixed
-  apply pureSecond_from_frontier _ (successors20.map secondAt) successors20_complete
-  exact checkIndexTable completeSecondTable (by decide +kernel)
+theorem first20_checked : firstContinuation (firstAt 20) = false :=
+  certifyFirst 20 successors20 (by decide +kernel) (by decide +kernel)
+    first20_mixed successors20_complete (by decide +kernel)
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
@@ -9068,103 +9013,133 @@ theorem negCoverAll : rangeCheck rawNegCover 0 112 = true :=
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem negMixed0 : rangeCheck rawNegMixedTest 0 56 = true := by decide +kernel
+theorem negMixed0 : rangeCheck rawNegMixedTest 0 24 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem negMixed1 : rangeCheck rawNegMixedTest 56 56 = true := by decide +kernel
+theorem negMixed1 : rangeCheck rawNegMixedTest 24 24 = true := by decide +kernel
 
-abbrev appendNegMixed := @rangeAppend rawNegMixedTest
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem negMixed2 : rangeCheck rawNegMixedTest 48 24 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem negMixed3 : rangeCheck rawNegMixedTest 72 24 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem negMixed4 : rangeCheck rawNegMixedTest 96 16 = true := by decide +kernel
+
+abbrev negMixedAppend := @rangeAppend rawNegMixedTest
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
 theorem negMixedAll : rangeCheck rawNegMixedTest 0 112 = true :=
-  (@appendNegMixed 0 56 56
-    negMixed0
-    negMixed1)
+  (@negMixedAppend 0 48 64 (@negMixedAppend 0 24 24 negMixed0 negMixed1) (@negMixedAppend 48 24 40 negMixed2 (@negMixedAppend 72 24 16 negMixed3 negMixed4)))
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem negSecond0 : rangeCheck rawNegSecondTest 0 96 = true := by decide +kernel
+theorem negSecond0 : rangeCheck rawNegSecondTest 0 25 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem negSecond1 : rangeCheck rawNegSecondTest 96 96 = true := by decide +kernel
+theorem negSecond1 : rangeCheck rawNegSecondTest 25 31 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem negSecond2 : rangeCheck rawNegSecondTest 192 96 = true := by decide +kernel
+theorem negSecond2 : rangeCheck rawNegSecondTest 56 41 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem negSecond3 : rangeCheck rawNegSecondTest 288 96 = true := by decide +kernel
+theorem negSecond3 : rangeCheck rawNegSecondTest 97 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem negSecond4 : rangeCheck rawNegSecondTest 384 96 = true := by decide +kernel
+theorem negSecond4 : rangeCheck rawNegSecondTest 159 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem negSecond5 : rangeCheck rawNegSecondTest 480 96 = true := by decide +kernel
+theorem negSecond5 : rangeCheck rawNegSecondTest 221 53 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem negSecond6 : rangeCheck rawNegSecondTest 576 96 = true := by decide +kernel
+theorem negSecond6 : rangeCheck rawNegSecondTest 274 31 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem negSecond7 : rangeCheck rawNegSecondTest 672 96 = true := by decide +kernel
+theorem negSecond7 : rangeCheck rawNegSecondTest 305 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem negSecond8 : rangeCheck rawNegSecondTest 768 96 = true := by decide +kernel
+theorem negSecond8 : rangeCheck rawNegSecondTest 367 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem negSecond9 : rangeCheck rawNegSecondTest 864 96 = true := by decide +kernel
+theorem negSecond9 : rangeCheck rawNegSecondTest 429 28 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem negSecond10 : rangeCheck rawNegSecondTest 960 96 = true := by decide +kernel
+theorem negSecond10 : rangeCheck rawNegSecondTest 457 32 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem negSecond11 : rangeCheck rawNegSecondTest 1056 96 = true := by decide +kernel
+theorem negSecond11 : rangeCheck rawNegSecondTest 489 62 = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
-theorem negSecond12 : rangeCheck rawNegSecondTest 1152 77 = true := by decide +kernel
+theorem negSecond12 : rangeCheck rawNegSecondTest 551 62 = true := by decide +kernel
 
-abbrev appendNegTail := @rangeAppend rawNegSecondTest
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem negSecond13 : rangeCheck rawNegSecondTest 613 46 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem negSecond14 : rangeCheck rawNegSecondTest 659 54 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem negSecond15 : rangeCheck rawNegSecondTest 713 62 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem negSecond16 : rangeCheck rawNegSecondTest 775 62 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem negSecond17 : rangeCheck rawNegSecondTest 837 62 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem negSecond18 : rangeCheck rawNegSecondTest 899 57 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem negSecond19 : rangeCheck rawNegSecondTest 956 50 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem negSecond20 : rangeCheck rawNegSecondTest 1006 62 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem negSecond21 : rangeCheck rawNegSecondTest 1068 62 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem negSecond22 : rangeCheck rawNegSecondTest 1130 62 = true := by decide +kernel
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 0 in
+theorem negSecond23 : rangeCheck rawNegSecondTest 1192 37 = true := by decide +kernel
+
+abbrev negSecondAppend := @rangeAppend rawNegSecondTest
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
 theorem negSecondAll : rangeCheck rawNegSecondTest 0 1229 = true :=
-  (@appendNegTail 0 576 653
-    (@appendNegTail 0 288 288
-     (@appendNegTail 0 96 192
-      negSecond0
-      (@appendNegTail 96 96 96
-       negSecond1
-       negSecond2))
-     (@appendNegTail 288 96 192
-      negSecond3
-      (@appendNegTail 384 96 96
-       negSecond4
-       negSecond5)))
-    (@appendNegTail 576 288 365
-     (@appendNegTail 576 96 192
-      negSecond6
-      (@appendNegTail 672 96 96
-       negSecond7
-       negSecond8))
-     (@appendNegTail 864 192 173
-      (@appendNegTail 864 96 96
-       negSecond9
-       negSecond10)
-      (@appendNegTail 1056 96 77
-       negSecond11
-       negSecond12))))
+  (@negSecondAppend 0 551 678 (@negSecondAppend 0 274 277 (@negSecondAppend 0 97 177 (@negSecondAppend 0 25 72 negSecond0 (@negSecondAppend 25 31 41 negSecond1 negSecond2)) (@negSecondAppend 97 62 115 negSecond3 (@negSecondAppend 159 62 53 negSecond4 negSecond5))) (@negSecondAppend 274 155 122 (@negSecondAppend 274 31 124 negSecond6 (@negSecondAppend 305 62 62 negSecond7 negSecond8)) (@negSecondAppend 429 28 94 negSecond9 (@negSecondAppend 457 32 62 negSecond10 negSecond11)))) (@negSecondAppend 551 348 330 (@negSecondAppend 551 162 186 (@negSecondAppend 551 62 100 negSecond12 (@negSecondAppend 613 46 54 negSecond13 negSecond14)) (@negSecondAppend 713 62 124 negSecond15 (@negSecondAppend 775 62 62 negSecond16 negSecond17))) (@negSecondAppend 899 169 161 (@negSecondAppend 899 57 112 negSecond18 (@negSecondAppend 956 50 62 negSecond19 negSecond20)) (@negSecondAppend 1068 62 99 negSecond21 (@negSecondAppend 1130 62 37 negSecond22 negSecond23)))))
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 0 in
